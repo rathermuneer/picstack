@@ -212,12 +212,15 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
 #stack { display: flex; flex-direction: column; gap: var(--g, 8px);
   width: var(--stack-w, 700px); max-width: 100%; position: relative; z-index: 1; }
+#stack.h { flex-direction: row; width: auto; height: var(--stack-w, 700px); max-width: none; align-items: stretch; }
 
 /* ── CELLS ── */
 .cell { position: relative; width: 100%; border-radius: 2px; overflow: hidden; }
+#stack.h .cell { width: auto; height: 100%; flex-shrink: 0; }
 .cell.empty { height: 72px; background: var(--surface); border: 1.5px dashed var(--border);
   display: flex; align-items: center; justify-content: center; cursor: pointer;
   transition: border-color 0.12s, background 0.12s; }
+#stack.h .cell.empty { height: 100%; width: 72px; }
 .cell.empty:hover, .cell.empty.drag-on { border-color: var(--accent); background: var(--accent-dim); }
 @keyframes breathe { 0%,100%{opacity:.2} 50%{opacity:.55} }
 .cell-plus { font-size: 16px; color: var(--border-hover); animation: breathe 2.6s ease-in-out infinite;
@@ -227,6 +230,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 .cell.filled { cursor: grab; background: var(--surface-2); }
 .cell.filled:active { cursor: grabbing; }
 .cell.filled img { display: block; width: 100%; height: auto; pointer-events: none; user-select: none; }
+#stack.h .cell.filled img { width: auto; height: 100%; }
 .cell.filled.drag-on { box-shadow: inset 0 0 0 2px var(--accent); }
 .cell.filled.dragging { opacity: 0.35; }
 .cell.filled.selected { box-shadow: inset 0 0 0 2px var(--accent); }
@@ -291,6 +295,13 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
     <div class="section">
       <div class="section-label">Layout</div>
+      <div class="ctrl-row" style="margin-bottom:10px">
+        <span class="ctrl-label">Direction</span>
+        <div class="xopt-btns">
+          <button class="xopt on" id="dir-v" title="Stack vertically">↕ V</button>
+          <button class="xopt"    id="dir-h" title="Stack horizontally">↔ H</button>
+        </div>
+      </div>
       <div class="ctrl-row">
         <span class="ctrl-label">Gap</span>
         <div class="gap-track">
@@ -299,7 +310,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
         </div>
       </div>
       <div class="ctrl-row">
-        <span class="ctrl-label">Width</span>
+        <span class="ctrl-label" id="dim-label">Width</span>
         <div class="gap-track">
           <input type="range" class="sl" id="width-slider" min="300" max="1200" value="700" step="50" style="width:72px" aria-label="Width">
           <span class="step-val" id="width-val">700</span>
@@ -445,7 +456,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   // ── State ──
   var imgs    = [];
   var sel     = null;
-  var gap     = 8, bg = '#ffffff', stackW = 700;
+  var gap     = 8, bg = '#ffffff', stackW = 700, stackDir = 'v';
   var exportRes = 2, exportFmt = 'jpeg', pdfMode = 'combined';
   var dragSrc = null, toastT = null;
   var deferredInstall = null;
@@ -541,7 +552,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
   function saveSettings() {
     try {
-      localStorage.setItem('cm-settings', JSON.stringify({ gap: gap, bg: bg, stackW: stackW,
+      localStorage.setItem('cm-settings', JSON.stringify({ gap: gap, bg: bg, stackW: stackW, stackDir: stackDir,
         exportRes: exportRes, exportFmt: exportFmt, pdfMode: pdfMode, compress: compress }));
     } catch (e) {}
   }
@@ -560,7 +571,10 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     try {
       var s = JSON.parse(localStorage.getItem('cm-settings') || 'null');
       if (!s) return;
-      gap = s.gap || 8; bg = s.bg || '#ffffff'; stackW = s.stackW || 700;
+      gap = s.gap || 8; bg = s.bg || '#ffffff'; stackW = s.stackW || 700; stackDir = s.stackDir || 'v';
+      document.getElementById('dir-v').classList.toggle('on', stackDir === 'v');
+      document.getElementById('dir-h').classList.toggle('on', stackDir === 'h');
+      document.getElementById('dim-label').textContent = stackDir === 'h' ? 'Height' : 'Width';
       if (s.exportRes) exportRes = s.exportRes;
       if (s.exportFmt) exportFmt = s.exportFmt;
       if (s.pdfMode)   pdfMode   = s.pdfMode;
@@ -756,6 +770,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   function render() {
     stackEl.style.setProperty('--g', gap + 'px');
     stackEl.style.setProperty('--stack-w', stackW + 'px');
+    stackEl.classList.toggle('h', stackDir === 'h');
     emptyMsg.classList.toggle('gone', imgs.length > 0);
     var frag = document.createDocumentFragment();
     imgs.forEach(function (_, i) { frag.appendChild(makeFilledCell(i)); });
@@ -846,6 +861,16 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
   gapSlider.addEventListener('input', function () { gap = parseInt(gapSlider.value, 10); gapVal.textContent = gap + 'px'; render(); saveState(); });
   widthSlider.addEventListener('input', function () { stackW = parseInt(widthSlider.value, 10); widthVal.textContent = stackW; render(); saveState(); });
+
+  function setDir(d) {
+    stackDir = d;
+    document.getElementById('dir-v').classList.toggle('on', d === 'v');
+    document.getElementById('dir-h').classList.toggle('on', d === 'h');
+    document.getElementById('dim-label').textContent = d === 'h' ? 'Height' : 'Width';
+    render(); saveState();
+  }
+  document.getElementById('dir-v').addEventListener('click', function () { setDir('v'); });
+  document.getElementById('dir-h').addEventListener('click', function () { setDir('h'); });
 
   document.querySelectorAll('.swatch').forEach(function (sw) {
     sw.addEventListener('click', function () { bg = sw.dataset.bg; document.querySelectorAll('.swatch').forEach(function (s) { s.classList.remove('on'); }); sw.classList.add('on'); saveState(); });
@@ -983,26 +1008,38 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   }
 
   // ── Export ──
-  function getExportWidth() { return stackW * exportRes; }
+  function getExportDim() { return stackW * exportRes; }
 
-  function buildCanvas(exportW, done) {
+  function buildCanvas(done) {
     if (!imgs.length) { done(expCanvas); return; }
     var loaded = new Array(imgs.length), pending = imgs.length;
     imgs.forEach(function (imgData, idx) {
       var im = new Image();
-      im.onload  = function () { loaded[idx] = im;   pending--; if (!pending) drawStack(loaded, exportW, done); };
-      im.onerror = function () { loaded[idx] = null; pending--; if (!pending) drawStack(loaded, exportW, done); };
+      im.onload  = function () { loaded[idx] = im;   pending--; if (!pending) drawStack(loaded, done); };
+      im.onerror = function () { loaded[idx] = null; pending--; if (!pending) drawStack(loaded, done); };
       im.src = imgData.dataUrl;
     });
   }
 
-  function drawStack(loadedImgs, exportW, done) {
-    var heights = loadedImgs.map(function (im) { return im ? Math.round(exportW * im.naturalHeight / im.naturalWidth) : Math.round(exportW * 0.75); });
-    var totalH = heights.reduce(function (s, h) { return s + h; }, 0) + gap * Math.max(0, loadedImgs.length - 1);
-    expCanvas.width = exportW; expCanvas.height = totalH;
-    var ctx = expCanvas.getContext('2d'); ctx.fillStyle = bg; ctx.fillRect(0, 0, exportW, totalH);
-    var y = 0;
-    loadedImgs.forEach(function (im, idx) { var h = heights[idx]; if (im) drawWithEnhance(ctx, im, imgs[idx], 0, y, exportW, h); y += h + gap; });
+  function drawStack(loadedImgs, done) {
+    var dim = getExportDim();
+    if (stackDir === 'h') {
+      var exportH = dim;
+      var widths = loadedImgs.map(function (im) { return im ? Math.round(exportH * im.naturalWidth / im.naturalHeight) : Math.round(exportH * 0.75); });
+      var totalW = widths.reduce(function (s, w) { return s + w; }, 0) + gap * Math.max(0, loadedImgs.length - 1);
+      expCanvas.width = totalW; expCanvas.height = exportH;
+      var ctx = expCanvas.getContext('2d'); ctx.fillStyle = bg; ctx.fillRect(0, 0, totalW, exportH);
+      var x = 0;
+      loadedImgs.forEach(function (im, idx) { var w = widths[idx]; if (im) drawWithEnhance(ctx, im, imgs[idx], x, 0, w, exportH); x += w + gap; });
+    } else {
+      var exportW = dim;
+      var heights = loadedImgs.map(function (im) { return im ? Math.round(exportW * im.naturalHeight / im.naturalWidth) : Math.round(exportW * 0.75); });
+      var totalH = heights.reduce(function (s, h) { return s + h; }, 0) + gap * Math.max(0, loadedImgs.length - 1);
+      expCanvas.width = exportW; expCanvas.height = totalH;
+      var ctx = expCanvas.getContext('2d'); ctx.fillStyle = bg; ctx.fillRect(0, 0, exportW, totalH);
+      var y = 0;
+      loadedImgs.forEach(function (im, idx) { var h = heights[idx]; if (im) drawWithEnhance(ctx, im, imgs[idx], 0, y, exportW, h); y += h + gap; });
+    }
     done(expCanvas);
   }
 
@@ -1018,7 +1055,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   dlImg.addEventListener('click', function () {
     if (!imgs.length) return;
     dlImg.disabled = true; dlImg.textContent = '…';
-    buildCanvas(getExportWidth(), function (c) {
+    buildCanvas(function (c) {
       c.toBlob(function (blob) {
         var url = URL.createObjectURL(blob), a = document.createElement('a');
         a.href = url; a.download = 'collage' + getExt(); a.click(); URL.revokeObjectURL(url);
@@ -1035,7 +1072,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   });
 
   function exportPdfCombined() {
-    buildCanvas(getExportWidth(), function (c) {
+    buildCanvas(function (c) {
       var dataUrl = c.toDataURL(getMime(), getQ()), imgW = c.width, imgH = c.height;
       openPrintWindow(
         '<style>*{margin:0;padding:0}html,body{width:' + imgW + 'px;height:' + imgH + 'px;overflow:hidden}' +
@@ -1046,27 +1083,30 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   }
 
   function exportPdfPages() {
-    // Render each image to its own canvas, then open all in one print window
-    var exportW = getExportWidth();
-    var loaded  = new Array(imgs.length), pending = imgs.length;
-
+    var dim = getExportDim();
+    var loaded = new Array(imgs.length), pending = imgs.length;
     imgs.forEach(function (imgData, idx) {
       var im = new Image();
-      im.onload  = function () { loaded[idx] = im;   pending--; if (!pending) buildPdfPages(loaded, exportW); };
-      im.onerror = function () { loaded[idx] = null; pending--; if (!pending) buildPdfPages(loaded, exportW); };
+      im.onload  = function () { loaded[idx] = im;   pending--; if (!pending) buildPdfPages(loaded, dim); };
+      im.onerror = function () { loaded[idx] = null; pending--; if (!pending) buildPdfPages(loaded, dim); };
       im.src = imgData.dataUrl;
     });
   }
 
-  function buildPdfPages(loadedImgs, exportW) {
+  function buildPdfPages(loadedImgs, dim) {
     var pageData = loadedImgs.map(function (im, idx) {
       if (!im) return null;
-      var h   = Math.round(exportW * im.naturalHeight / im.naturalWidth);
-      var c   = document.createElement('canvas'); c.width = exportW; c.height = h;
+      var cw, ch;
+      if (stackDir === 'h') {
+        ch = dim; cw = Math.round(dim * im.naturalWidth / im.naturalHeight);
+      } else {
+        cw = dim; ch = Math.round(dim * im.naturalHeight / im.naturalWidth);
+      }
+      var c = document.createElement('canvas'); c.width = cw; c.height = ch;
       var ctx = c.getContext('2d');
-      ctx.fillStyle = bg; ctx.fillRect(0, 0, exportW, h);
-      drawWithEnhance(ctx, im, imgs[idx], 0, 0, exportW, h);
-      return { url: c.toDataURL(getMime(), getQ()), w: exportW, h: h };
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, cw, ch);
+      drawWithEnhance(ctx, im, imgs[idx], 0, 0, cw, ch);
+      return { url: c.toDataURL(getMime(), getQ()), w: cw, h: ch };
     }).filter(Boolean);
 
     var pages = pageData.map(function (p, i) {
