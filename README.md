@@ -16,13 +16,18 @@ mobile phone photos. No account, no upload, no server — runs locally in your b
 
 ## Quick start
 
-### Mac / Linux
-```bash
-./start.sh   # or double-click in Finder
-```
+### Step 1 — Download
 
-### Windows
-Double-click `start.bat`
+Click **Code → Download ZIP** at the top of this repo, then unzip the folder.
+
+### Step 2 — Run
+
+**Mac / Linux** — double-click `start.sh` in Finder  
+(first time on Mac: right-click → Open if macOS asks for confirmation)
+
+**Windows** — double-click `start.bat`
+
+The app opens automatically at `http://localhost:8080`.
 
 > Requires Python 3 — pre-installed on macOS. Windows: download from [python.org](https://python.org).
 
