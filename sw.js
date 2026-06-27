@@ -1,4 +1,4 @@
-var CACHE = 'collage-maker-v3';
+var CACHE = 'collage-maker-v8';
 var FILES = ['/', '/index.html', '/manifest.json', '/icon.svg', '/sw.js'];
 
 self.addEventListener('install', function (e) {
