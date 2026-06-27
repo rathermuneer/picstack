@@ -88,8 +88,9 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 /* ── PER-IMAGE PANEL ── */
 #img-section { border-top: 1px solid var(--border); padding-top: 18px; }
 .img-placeholder { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; line-height: 1.6; padding: 4px 0; }
-.img-name { font-size: 10px; color: var(--text-muted); letter-spacing: 0.06em; margin-bottom: 10px;
+.img-name { font-size: 10px; color: var(--text-muted); letter-spacing: 0.06em; margin-bottom: 4px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.img-meta { font-size: 9px; color: var(--text-dim); letter-spacing: 0.06em; margin-bottom: 10px; }
 .rotate-btns { display: flex; gap: 4px; }
 .rot-btn { width: 28px; height: 24px; background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 2px; color: var(--text-muted); font-family: inherit; font-size: 14px; cursor: pointer;
@@ -272,6 +273,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       <div class="img-placeholder" id="img-placeholder">Click an image to adjust brightness, contrast &amp; sharpness</div>
       <div id="img-controls" style="display:none">
         <div class="img-name" id="img-panel-name"></div>
+        <div class="img-meta" id="img-meta"></div>
         <div class="ctrl-row" style="margin-bottom:10px">
           <span class="ctrl-label">Rotate</span>
           <div class="rotate-btns">
@@ -318,6 +320,13 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
           <button class="xopt"    data-fmt="png"  title="Lossless, better for screenshots">PNG</button>
         </div>
       </div>
+      <div class="xopt-row" style="margin-bottom:6px" id="compress-row">
+        <span class="ctrl-label">Compress</span>
+        <div class="xopt-btns">
+          <button class="xopt on" id="compress-off" title="High quality export (default)">Off</button>
+          <button class="xopt"    id="compress-on"  title="Smart JPEG compression — ~25% smaller, no visible quality loss">On</button>
+        </div>
+      </div>
       <button class="exp-btn btn-img" id="dl-img" disabled>↓ Image</button>
       <div class="pdf-row">
         <button class="exp-btn" id="dl-pdf" disabled>↓ PDF</button>
@@ -360,6 +369,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   var exportRes = 2, exportFmt = 'jpeg', pdfMode = 'combined';
   var dragSrc = null, toastT = null;
   var deferredInstall = null;
+  var compress = false;
 
   // ── DOM ──
   var stackEl     = document.getElementById('stack');
@@ -381,6 +391,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   var imgPlaceholder = document.getElementById('img-placeholder');
   var imgControls    = document.getElementById('img-controls');
   var imgPanelName   = document.getElementById('img-panel-name');
+  var imgMeta        = document.getElementById('img-meta');
   var eBr = document.getElementById('e-br'), eBrVal = document.getElementById('e-br-val');
   var eCo = document.getElementById('e-co'), eCoVal = document.getElementById('e-co-val');
   var eSa = document.getElementById('e-sa'), eSaVal = document.getElementById('e-sa-val');
@@ -392,6 +403,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   // ── Helpers ──
   function uid() { return Math.random().toString(36).slice(2); }
   function fmtV(v) { return (v > 0 ? '+' : '') + v; }
+  function calcSize(url) { return Math.round((url.length - url.indexOf(',') - 1) * 3 / 4); }
+  function fmtSize(b) { return b < 1048576 ? Math.round(b / 1024) + ' KB' : (b / 1048576).toFixed(1) + ' MB'; }
 
   function showToast(msg) {
     if (toastT) clearTimeout(toastT);
@@ -413,7 +426,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   function saveState() {
     try {
       localStorage.setItem('cm-settings', JSON.stringify({ gap: gap, bg: bg, stackW: stackW,
-        exportRes: exportRes, exportFmt: exportFmt, pdfMode: pdfMode }));
+        exportRes: exportRes, exportFmt: exportFmt, pdfMode: pdfMode, compress: compress }));
       localStorage.setItem('cm-imgs', JSON.stringify(imgs));
       saveDot.className = 'save-dot saved';
     } catch (e) {
@@ -430,6 +443,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
         if (s.exportRes) exportRes = s.exportRes;
         if (s.exportFmt) exportFmt = s.exportFmt;
         if (s.pdfMode)   pdfMode   = s.pdfMode;
+        if (s.compress)  { compress = s.compress; document.getElementById('compress-on').classList.toggle('on', compress); document.getElementById('compress-off').classList.toggle('on', !compress); }
         gapSlider.value = gap; gapVal.textContent = gap + 'px';
         widthSlider.value = stackW; widthVal.textContent = stackW;
         document.querySelectorAll('.swatch').forEach(function (sw) { sw.classList.toggle('on', sw.dataset.bg === bg); });
@@ -503,12 +517,16 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
         var ur = new FileReader();
         ur.onload = function (e2) {
           fixOrientation(e2.target.result, orientation, function (url) {
-            loaded.push({ id: uid(), dataUrl: url, name: f.name, enhance: { br:0, co:0, sa:0, sh:0 } });
-            pending--;
-            if (!pending) {
-              imgs = imgs.concat(loaded); render(); syncCount(); syncButtons(); saveState();
-              showToast(loaded.length + ' image' + (loaded.length > 1 ? 's' : '') + ' added');
-            }
+            var dimImg = new Image();
+            dimImg.onload = function () {
+              loaded.push({ id: uid(), dataUrl: url, name: f.name, w: dimImg.width, h: dimImg.height, size: calcSize(url), enhance: { br:0, co:0, sa:0, sh:0 } });
+              pending--;
+              if (!pending) {
+                imgs = imgs.concat(loaded); render(); syncCount(); syncButtons(); saveState();
+                showToast(loaded.length + ' image' + (loaded.length > 1 ? 's' : '') + ' added');
+              }
+            };
+            dimImg.src = url;
           });
         };
         ur.readAsDataURL(f);
@@ -524,8 +542,13 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       var ur = new FileReader();
       ur.onload = function (e2) {
         fixOrientation(e2.target.result, orientation, function (url) {
-          imgs[idx].dataUrl = url; imgs[idx].name = file.name;
-          render(); saveState(); showToast('Image replaced');
+          var dimImg = new Image();
+          dimImg.onload = function () {
+            imgs[idx].dataUrl = url; imgs[idx].name = file.name;
+            imgs[idx].w = dimImg.width; imgs[idx].h = dimImg.height; imgs[idx].size = calcSize(url);
+            render(); saveState(); showToast('Image replaced');
+          };
+          dimImg.src = url;
         });
       };
       ur.readAsDataURL(file);
@@ -560,6 +583,16 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     imgPlaceholder.style.display = 'none'; imgControls.style.display = 'block';
     var name = imgs[i].name || ('Image ' + (i + 1));
     imgPanelName.textContent = name.length > 24 ? name.slice(0,22) + '…' : name;
+    function showMeta() {
+      var d = imgs[i];
+      imgMeta.textContent = d.w && d.h ? d.w + ' × ' + d.h + (d.size ? ' · ' + fmtSize(d.size) : '') : (d.size ? fmtSize(d.size) : '');
+    }
+    if (imgs[i].w) { showMeta(); } else {
+      imgMeta.textContent = '…';
+      var tmpImg = new Image();
+      tmpImg.onload = function () { imgs[i].w = tmpImg.width; imgs[i].h = tmpImg.height; imgs[i].size = calcSize(imgs[i].dataUrl); showMeta(); };
+      tmpImg.src = imgs[i].dataUrl;
+    }
     eBr.value = e.br; eBrVal.textContent = fmtV(e.br); eBrVal.classList.toggle('lit', e.br !== 0);
     eCo.value = e.co; eCoVal.textContent = fmtV(e.co); eCoVal.classList.toggle('lit', e.co !== 0);
     eSa.value = e.sa; eSaVal.textContent = fmtV(e.sa); eSaVal.classList.toggle('lit', e.sa !== 0);
@@ -682,8 +715,20 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     b.addEventListener('click', function () {
       exportFmt = b.dataset.fmt;
       document.querySelectorAll('[data-fmt]').forEach(function (x) { x.classList.remove('on'); });
-      b.classList.add('on'); saveState();
+      b.classList.add('on'); syncCompressRow(); saveState();
     });
+  });
+  document.getElementById('compress-off').addEventListener('click', function () {
+    compress = false;
+    document.getElementById('compress-off').classList.add('on');
+    document.getElementById('compress-on').classList.remove('on');
+    saveState();
+  });
+  document.getElementById('compress-on').addEventListener('click', function () {
+    compress = true;
+    document.getElementById('compress-on').classList.add('on');
+    document.getElementById('compress-off').classList.remove('on');
+    saveState(); showToast('Smart compress on — ~25% smaller JPEG');
   });
   document.getElementById('pmt-combined').addEventListener('click', function () {
     pdfMode = 'combined';
@@ -785,7 +830,12 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
   function getMime() { return exportFmt === 'png' ? 'image/png' : 'image/jpeg'; }
   function getExt()  { return exportFmt === 'png' ? '.png' : '.jpg'; }
-  function getQ()    { return exportFmt === 'png' ? undefined : 0.93; }
+  function getQ()    { return exportFmt === 'png' ? undefined : (compress ? 0.82 : 0.93); }
+  function syncCompressRow() {
+    var row = document.getElementById('compress-row');
+    row.style.opacity = exportFmt === 'png' ? '0.35' : '1';
+    row.style.pointerEvents = exportFmt === 'png' ? 'none' : '';
+  }
 
   dlImg.addEventListener('click', function () {
     if (!imgs.length) return;
@@ -886,7 +936,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   }
 
   // ── Init ──
-  loadState(); render(); syncCount(); syncButtons();
+  loadState(); render(); syncCount(); syncButtons(); syncCompressRow();
 })();
 </script>
 </body>
