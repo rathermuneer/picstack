@@ -1,7 +1,7 @@
 # Collage Maker
 
 A lightweight, offline-capable web app for stacking, enhancing, and exporting
-mobile phone photos. No account, no upload, no server — runs locally in your browser.
+images. No account, no upload, no server — runs locally in your browser.
 
 ## Features
 - Stack images vertically — drop photos, drag to reorder
