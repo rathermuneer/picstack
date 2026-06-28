@@ -1,7 +1,7 @@
 {
-  "name": "Collage Maker",
-  "short_name": "Collage",
-  "description": "Stack, enhance, and export mobile photos",
+  "name": "Picstack",
+  "short_name": "Picstack",
+  "description": "Stack, enhance, and compress your photos — free, offline, no uploads",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#0D0D16",

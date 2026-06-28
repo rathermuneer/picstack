@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Collage Maker</title>
+<title>Picstack</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0D0D16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Collage">
+<meta name="apple-mobile-web-app-title" content="Picstack">
 <link rel="apple-touch-icon" href="/icon.svg">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -275,7 +275,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 <div id="app">
   <aside id="sidebar">
     <div class="logo">
-      <div class="logo-word">Collage <span class="save-dot" id="save-dot"></span></div>
+      <div class="logo-word">Picstack <span class="save-dot" id="save-dot"></span></div>
       <div class="logo-sub">image stacker</div>
     </div>
 
@@ -448,7 +448,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 <input type="file" id="file-input" accept="image/*,.heic,.heif" multiple style="display:none" aria-hidden="true">
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="install-bar" role="complementary" aria-label="Install app">
-  <span>Install Collage Maker as a desktop app — works offline</span>
+  <span>Install Picstack as a desktop app — works offline</span>
   <div style="display:flex;gap:8px">
     <button id="install-btn">Install</button>
     <button id="install-dismiss" class="clear-link">Not now</button>
@@ -1105,7 +1105,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       var mime = getMime(), q = getQ(), ext = getExt();
       function finish(blob) {
         var url = URL.createObjectURL(blob), a = document.createElement('a');
-        a.href = url; a.download = 'collage' + ext; a.click(); URL.revokeObjectURL(url);
+        a.href = url; a.download = 'picstack' + ext; a.click(); URL.revokeObjectURL(url);
         dlImg.disabled = false; dlImg.textContent = '↓ Image';
         showToast('Image saved' + (blob.size ? ' · ' + fmtSize(blob.size) : ''));
       }
@@ -1130,7 +1130,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       openPrintWindow(
         '<style>*{margin:0;padding:0}html,body{width:' + imgW + 'px;height:' + imgH + 'px;overflow:hidden}' +
         '@page{margin:0;size:' + imgW + 'px ' + imgH + 'px}img{display:block;width:' + imgW + 'px;height:' + imgH + 'px}</style>' +
-        '<img src="' + dataUrl + '" alt="Collage">'
+        '<img src="' + dataUrl + '" alt="Picstack">'
       );
     });
   }
@@ -1181,7 +1181,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   function openPrintWindow(bodyContent) {
     var pw = window.open('', '_blank', 'width=860,height=680');
     if (!pw) { showToast('Allow pop-ups to save PDF'); dlPdf.disabled = false; dlPdf.textContent = '↓ PDF'; return; }
-    pw.document.write('<!DOCTYPE html><html><head><title>Collage</title></head><body>' + bodyContent +
+    pw.document.write('<!DOCTYPE html><html><head><title>Picstack</title></head><body>' + bodyContent +
       '<script>window.onload=function(){window.print();setTimeout(function(){window.close()},800)}<\/script></body></html>');
     pw.document.close();
     dlPdf.disabled = false; dlPdf.textContent = '↓ PDF';
