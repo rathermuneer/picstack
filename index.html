@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Collage Maker</title>
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0D0D16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -182,22 +182,15 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 .btn-img { background: var(--accent); color: #fff; }
 .btn-img:not(:disabled):hover { background: #ff7244; }
 
-.pdf-row { display: flex; gap: 5px; align-items: stretch; }
-.pdf-row .exp-btn { flex: 1; background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border); }
-.pdf-row .exp-btn:not(:disabled):hover { border-color: var(--border-hover); color: var(--text); }
-
-.pdf-mode { display: flex; flex-direction: column; gap: 3px; }
-.pmt { width: 26px; flex: 1; background: var(--surface-2); border: 1px solid var(--border); border-radius: 2px;
-  color: var(--text-muted); font-size: 12px; cursor: pointer; display: flex; align-items: center;
-  justify-content: center; transition: all 0.1s; padding: 0; font-family: inherit; }
-.pmt.on  { background: var(--accent); border-color: var(--accent); color: #fff; }
-.pmt:hover:not(.on) { border-color: var(--border-hover); color: var(--text); }
-.pmt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .clear-link { background: none; border: none; color: var(--text-dim); font-family: inherit; font-size: 9px;
   letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; text-align: center; padding: 2px 0; transition: color 0.12s; }
 .clear-link:hover { color: var(--text-muted); }
 .clear-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.privacy-note { font-size: 9px; color: var(--text-dim); letter-spacing: 0.08em; text-align: center;
+  margin-top: 4px; padding: 0 14px; line-height: 1.5; }
+.privacy-note span { opacity: 0.6; }
 
 /* ── WORKSPACE ── */
 #workspace { flex: 1; background: var(--ground);
@@ -392,14 +385,24 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
           <button class="xopt"    id="compress-on"  title="Smart JPEG compression — ~25% smaller, no visible quality loss">On</button>
         </div>
       </div>
-      <button class="exp-btn btn-img" id="dl-img" disabled>↓ Image</button>
-      <div class="pdf-row">
-        <button class="exp-btn" id="dl-pdf" disabled>↓ PDF</button>
-        <div class="pdf-mode">
-          <button class="pmt on" id="pmt-combined" title="All images on one page">⊟</button>
-          <button class="pmt"    id="pmt-pages"    title="One image per page">≡</button>
+      <div class="xopt-row" style="margin-bottom:6px" id="maxsize-row">
+        <span class="ctrl-label">Max size</span>
+        <div class="xopt-btns">
+          <button class="xopt on" data-maxsize="0"       title="No size limit">Off</button>
+          <button class="xopt"    data-maxsize="2097152" title="Compress to under 2 MB">2MB</button>
+          <button class="xopt"    data-maxsize="1048576" title="Compress to under 1 MB">1MB</button>
+          <button class="xopt"    data-maxsize="512000"  title="Compress to under 500 KB">500K</button>
         </div>
       </div>
+      <button class="exp-btn btn-img" id="dl-img" disabled>↓ Image</button>
+      <div class="xopt-row" style="margin-bottom:4px">
+        <span class="ctrl-label">PDF layout</span>
+        <div class="xopt-btns">
+          <button class="xopt on" id="pmt-combined" title="All images on one page">Single</button>
+          <button class="xopt"    id="pmt-pages"    title="One image per page">Per image</button>
+        </div>
+      </div>
+      <button class="exp-btn" id="dl-pdf" disabled style="margin-bottom:2px">↓ PDF</button>
       <button class="clear-link" id="clear-all">Clear all</button>
     </div>
   </aside>
@@ -410,6 +413,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       <div class="empty-icon" aria-hidden="true">⬡</div>
       <div class="empty-head">Drop images anywhere to start</div>
       <div class="empty-body">or click Add images<br>drag to reorder · click to select</div>
+      <div class="privacy-note"><span>🔒 Your images never leave your device — no uploads, no account, free forever</span></div>
     </div>
   </main>
 </div>
@@ -441,7 +445,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 </div>
 
 <canvas id="exp-canvas" style="display:none" aria-hidden="true"></canvas>
-<input type="file" id="file-input" accept="image/*" multiple style="display:none" aria-hidden="true">
+<input type="file" id="file-input" accept="image/*,.heic,.heif" multiple style="display:none" aria-hidden="true">
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="install-bar" role="complementary" aria-label="Install app">
   <span>Install Collage Maker as a desktop app — works offline</span>
@@ -461,6 +465,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   var dragSrc = null, toastT = null;
   var deferredInstall = null;
   var compress = false;
+  var maxSize = 0;
 
   // ── DOM ──
   var stackEl     = document.getElementById('stack');
@@ -553,7 +558,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   function saveSettings() {
     try {
       localStorage.setItem('cm-settings', JSON.stringify({ gap: gap, bg: bg, stackW: stackW, stackDir: stackDir,
-        exportRes: exportRes, exportFmt: exportFmt, pdfMode: pdfMode, compress: compress }));
+        exportRes: exportRes, exportFmt: exportFmt, pdfMode: pdfMode, compress: compress, maxSize: maxSize }));
     } catch (e) {}
   }
 
@@ -579,6 +584,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       if (s.exportFmt) exportFmt = s.exportFmt;
       if (s.pdfMode)   pdfMode   = s.pdfMode;
       if (s.compress)  { compress = s.compress; document.getElementById('compress-on').classList.toggle('on', compress); document.getElementById('compress-off').classList.toggle('on', !compress); }
+      if (s.maxSize)   { maxSize = s.maxSize; document.querySelectorAll('[data-maxsize]').forEach(function (b) { b.classList.toggle('on', parseInt(b.dataset.maxsize, 10) === maxSize); }); }
       gapSlider.value = gap; gapVal.textContent = gap + 'px';
       widthSlider.value = stackW; widthVal.textContent = stackW;
       document.querySelectorAll('.swatch').forEach(function (sw) { sw.classList.toggle('on', sw.dataset.bg === bg); });
@@ -671,6 +677,13 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
               if (!pending) {
                 imgs = imgs.concat(loaded); render(); syncCount(); syncTotalSize(); syncButtons(); saveState();
                 showToast(loaded.length + ' image' + (loaded.length > 1 ? 's' : '') + ' added');
+              }
+            };
+            dimImg.onerror = function () {
+              pending--;
+              showToast(f.name + ' — format not supported. Try converting to JPG first.');
+              if (!pending && loaded.length) {
+                imgs = imgs.concat(loaded); render(); syncCount(); syncTotalSize(); syncButtons(); saveState();
               }
             };
             dimImg.src = url;
@@ -774,7 +787,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     emptyMsg.classList.toggle('gone', imgs.length > 0);
     var frag = document.createDocumentFragment();
     imgs.forEach(function (_, i) { frag.appendChild(makeFilledCell(i)); });
-    frag.appendChild(makeEmptyCell(imgs.length));
+    if (imgs.length > 0) frag.appendChild(makeEmptyCell(imgs.length));
     stackEl.innerHTML = ''; stackEl.appendChild(frag);
   }
 
@@ -910,6 +923,15 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     document.getElementById('compress-off').classList.remove('on');
     saveState(); showToast('Smart compress on — ~25% smaller JPEG');
   });
+  document.querySelectorAll('[data-maxsize]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      maxSize = parseInt(b.dataset.maxsize, 10);
+      document.querySelectorAll('[data-maxsize]').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on'); saveState();
+      if (maxSize > 0) showToast('Max size ' + b.textContent + ' — quality auto-adjusted on export');
+    });
+  });
+
   document.getElementById('pmt-combined').addEventListener('click', function () {
     pdfMode = 'combined';
     document.getElementById('pmt-combined').classList.add('on');
@@ -1045,22 +1067,53 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
   function getMime() { return exportFmt === 'png' ? 'image/png' : 'image/jpeg'; }
   function getExt()  { return exportFmt === 'png' ? '.png' : '.jpg'; }
-  function getQ()    { return exportFmt === 'png' ? undefined : (compress ? 0.82 : 0.93); }
+  function getQ()    { return exportFmt === 'png' ? undefined : (compress ? 0.75 : 0.93); }
   function syncCompressRow() {
-    var row = document.getElementById('compress-row');
-    row.style.opacity = exportFmt === 'png' ? '0.35' : '1';
-    row.style.pointerEvents = exportFmt === 'png' ? 'none' : '';
+    var isPng = exportFmt === 'png';
+    var compressRow = document.getElementById('compress-row');
+    var maxsizeRow  = document.getElementById('maxsize-row');
+    compressRow.style.opacity = isPng ? '0.35' : '1';
+    compressRow.style.pointerEvents = isPng ? 'none' : '';
+    maxsizeRow.style.opacity = isPng ? '0.35' : '1';
+    maxsizeRow.style.pointerEvents = isPng ? 'none' : '';
+  }
+
+  function blobUnderSize(mime, q, targetBytes, cb) {
+    expCanvas.toBlob(function (blob) {
+      if (blob.size <= targetBytes) { cb(blob); return; }
+      var lo = 0.60, hi = q, bestBlob = null, iters = 0;
+      function step(qv) {
+        expCanvas.toBlob(function (b) {
+          iters++;
+          if (b.size <= targetBytes) { bestBlob = b; lo = qv; } else { hi = qv; }
+          if (iters >= 8 || (hi - lo) < 0.02) {
+            if (bestBlob) { cb(bestBlob); } else {
+              showToast('Can\'t reach target — saved at smallest quality');
+              cb(b);
+            }
+          } else { step((lo + hi) / 2); }
+        }, mime, qv);
+      }
+      step((lo + hi) / 2);
+    }, mime, q);
   }
 
   dlImg.addEventListener('click', function () {
     if (!imgs.length) return;
     dlImg.disabled = true; dlImg.textContent = '…';
     buildCanvas(function (c) {
-      c.toBlob(function (blob) {
+      var mime = getMime(), q = getQ(), ext = getExt();
+      function finish(blob) {
         var url = URL.createObjectURL(blob), a = document.createElement('a');
-        a.href = url; a.download = 'collage' + getExt(); a.click(); URL.revokeObjectURL(url);
-        dlImg.disabled = false; dlImg.textContent = '↓ Image'; showToast('Image saved');
-      }, getMime(), getQ());
+        a.href = url; a.download = 'collage' + ext; a.click(); URL.revokeObjectURL(url);
+        dlImg.disabled = false; dlImg.textContent = '↓ Image';
+        showToast('Image saved' + (blob.size ? ' · ' + fmtSize(blob.size) : ''));
+      }
+      if (maxSize > 0 && mime === 'image/jpeg') {
+        blobUnderSize(mime, q, maxSize, finish);
+      } else {
+        c.toBlob(finish, mime, q);
+      }
     });
   });
 
@@ -1243,7 +1296,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
   // ── Service worker ──
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(function () {});
+    navigator.serviceWorker.register('sw.js').catch(function () {});
   }
 
   // ── Init ──
