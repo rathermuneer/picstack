@@ -20,7 +20,7 @@ A free, offline-capable web app for stacking, enhancing, and compressing photos.
 
 ## Try it online
 
-**[https://rathermuneer.github.io/collage-maker/](https://rathermuneer.github.io/collage-maker/)**
+**[https://rathermuneer.github.io/picstack/](https://rathermuneer.github.io/picstack/)**
 
 No install needed — open in any modern browser.
 
