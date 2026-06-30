@@ -270,43 +270,6 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 #install-bar button:hover { background: #ff7244; }
 #install-dismiss { background: none !important; color: var(--text-dim) !important; padding: 6px 8px !important; }
 
-@media (max-width: 640px) {
-  #app { flex-direction: column; height: auto; min-height: 100vh; }
-
-  #sidebar {
-    width: 100%; min-width: 0;
-    border-right: none; border-bottom: 1px solid var(--border);
-    padding: 14px 0 0;
-    /* horizontal scroll so all controls are reachable */
-    flex-direction: row; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
-    align-items: flex-start; gap: 0;
-    /* don't let it grow taller than needed */
-    flex-shrink: 0;
-  }
-
-  /* stack logo + sections side by side */
-  .logo { padding: 0 14px 0; margin-bottom: 0; border-bottom: none;
-    border-right: 1px solid var(--border); white-space: nowrap; flex-shrink: 0; align-self: center; }
-  .section { padding: 0 14px; margin-bottom: 0; border-right: 1px solid var(--border);
-    flex-shrink: 0; white-space: nowrap; }
-  .sidebar-grow { display: none; }
-  .export-zone { padding: 0 14px; border-top: none; border-right: 1px solid var(--border);
-    flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 8px;
-    flex-shrink: 0; }
-
-  /* make sliders a bit wider so they're usable */
-  .sl { min-width: 60px; }
-  .gap-track { flex-wrap: nowrap; }
-
-  /* export buttons inline */
-  .exp-btn { width: auto; padding: 8px 12px; white-space: nowrap; }
-
-  #workspace {
-    flex: 1; padding: 20px 16px 60px;
-    min-height: 60vh;
-  }
-  #workspace.drag-active::after { left: 0; top: 0; }
-}
 </style>
 </head>
 <body>
