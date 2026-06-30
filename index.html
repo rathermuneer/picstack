@@ -325,6 +325,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     <div class="section" role="group" aria-labelledby="lbl-images">
       <h2 class="section-label" id="lbl-images">Images</h2>
       <button class="add-btn" id="add-btn"><span aria-hidden="true">+</span> Add images</button>
+      <button class="add-btn" id="camera-btn" style="margin-top:6px"><span aria-hidden="true">📷</span> Take photo</button>
       <div class="img-count" id="img-count" aria-live="polite">0 images</div>
       <div class="img-total-size" id="img-total-size" aria-live="polite"></div>
     </div>
@@ -490,6 +491,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 <div id="sr-announcer" aria-live="polite" aria-atomic="true" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap"></div>
 <canvas id="exp-canvas" style="display:none" aria-hidden="true"></canvas>
 <input type="file" id="file-input" accept="image/*,.heic,.heif" multiple style="display:none" aria-hidden="true">
+<input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none" aria-hidden="true">
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="install-bar" role="complementary" aria-label="Install app">
   <span>Install Picstack as a desktop app — works offline</span>
@@ -938,6 +940,11 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   // ── Controls ──
   addBtn.addEventListener('click', function () { fileInput.value = ''; fileInput.click(); });
   fileInput.addEventListener('change', function () { if (fileInput.files.length) loadFiles(fileInput.files); });
+
+  var cameraBtn   = document.getElementById('camera-btn');
+  var cameraInput = document.getElementById('camera-input');
+  cameraBtn.addEventListener('click', function () { cameraInput.value = ''; cameraInput.click(); });
+  cameraInput.addEventListener('change', function () { if (cameraInput.files.length) loadFiles(cameraInput.files); });
 
   gapSlider.addEventListener('input', function () { gap = parseInt(gapSlider.value, 10); gapVal.textContent = gap + 'px'; gapSlider.setAttribute('aria-valuetext', gap + ' pixels'); render(); saveState(); });
   widthSlider.addEventListener('input', function () { stackW = parseInt(widthSlider.value, 10); widthVal.textContent = stackW; widthSlider.setAttribute('aria-valuetext', stackW + ' pixels'); render(); saveState(); });
