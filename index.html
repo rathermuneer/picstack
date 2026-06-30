@@ -21,7 +21,7 @@
   --border-hover: #383850;
   --text:         #E2DDD8;
   --text-muted:   #AEACBF;
-  --text-dim:     #9896A8;
+  --text-dim:     #B3B1C4;
   --accent:       #FF5C2B;
   --accent-glow:  rgba(255, 92, 43, 0.22);
   --accent-dim:   rgba(255, 92, 43, 0.08);
@@ -29,88 +29,91 @@
 
 html, body { height: 100%; background: var(--ground); color: var(--text);
   font-family: 'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
-  font-size: 13px; overflow: hidden; }
+  font-size: 16px; overflow: hidden; }
 
 #app { display: flex; height: 100vh; width: 100vw; }
 
 /* ── SIDEBAR ── */
 #sidebar {
-  width: 200px; min-width: 200px; background: var(--surface);
+  width: 300px; min-width: 300px; background: var(--surface);
   border-right: 1px solid var(--border); display: flex; flex-direction: column;
   padding: 22px 0 0; overflow-y: auto;
 }
 
 .logo { padding: 0 18px 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
-.logo-word { font-size: 11px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--text); }
-.logo-sub  { font-size: 9px; color: var(--text-dim); letter-spacing: 0.14em; margin-top: 4px; text-transform: uppercase; }
+.logo-word { font-size: 13px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; color: var(--text); }
+.logo-sub  { font-size: 11px; color: var(--text-dim); letter-spacing: 0.14em; margin-top: 4px; text-transform: uppercase; }
 .save-dot  { display: inline-block; width: 5px; height: 5px; border-radius: 50%;
              background: var(--text-dim); margin-left: 6px; vertical-align: middle; transition: background 0.3s; }
 .save-dot.saved   { background: #4CAF50; }
 .save-dot.unsaved { background: var(--accent); }
 
 .section { padding: 0 18px; margin-bottom: 18px; }
-.section-label { font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase;
+.section-label { font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
   color: var(--text-dim); font-weight: 700; margin-bottom: 10px; }
 
 .add-btn { width: 100%; padding: 9px 12px; background: var(--accent-dim);
   border: 1px solid rgba(255,92,43,0.4); border-radius: 3px; color: var(--accent);
-  font-family: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  font-family: inherit; font-size: 13px; font-weight: 700; letter-spacing: 0.1em;
   cursor: pointer; text-align: left; display: flex; align-items: center; gap: 7px;
   transition: background 0.12s, border-color 0.12s; }
 .add-btn:hover { background: rgba(255,92,43,0.14); border-color: var(--accent); }
 .add-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.img-count { font-size: 10px; color: var(--text-dim); margin-top: 8px; letter-spacing: 0.06em; }
+.img-count { font-size: 12px; color: var(--text-dim); margin-top: 8px; letter-spacing: 0.06em; }
 .img-count em { font-style: normal; color: var(--accent); }
-.img-total-size { font-size: 9px; color: var(--text-dim); margin-top: 3px; letter-spacing: 0.06em; }
+.img-total-size { font-size: 11px; color: var(--text-dim); margin-top: 3px; letter-spacing: 0.06em; }
 
 .ctrl-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px; }
-.ctrl-label { font-size: 10px; color: var(--text-muted); letter-spacing: 0.06em; }
+.ctrl-label { font-size: 12px; color: var(--text-muted); letter-spacing: 0.06em; }
 
 .sl { -webkit-appearance: none; appearance: none; height: 2px; background: var(--border);
-  border-radius: 2px; outline: none; cursor: pointer; }
+  border-radius: 2px; cursor: pointer; }
 .sl::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 11px; border-radius: 50%;
   background: var(--accent); cursor: pointer; transition: box-shadow 0.12s; }
 .sl:hover::-webkit-slider-thumb { box-shadow: 0 0 0 4px var(--accent-glow); }
 .sl:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .gap-track { display: flex; align-items: center; gap: 8px; }
-.step-val  { font-size: 11px; font-weight: 700; color: var(--text); min-width: 28px; text-align: right; }
+.step-val  { font-size: 13px; font-weight: 700; color: var(--text); min-width: 28px; text-align: right; }
 
 .swatch-row { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
 .swatch { width: 18px; height: 18px; border-radius: 2px; border: 2px solid transparent;
-  cursor: pointer; transition: border-color 0.1s, transform 0.1s; flex-shrink: 0; }
+  cursor: pointer; transition: border-color 0.1s, transform 0.1s; flex-shrink: 0;
+  position: relative; }
+/* expand tap/click area to 44×44 without changing visual size */
+.swatch::after { content: ''; position: absolute; inset: -13px; }
 .swatch:hover, .swatch.on { border-color: var(--text); transform: scale(1.15); }
 .swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.custom-color { -webkit-appearance: none; width: 18px; height: 18px; padding: 0;
+.custom-color { -webkit-appearance: none; width: 44px; height: 44px; padding: 0;
   border: 2px solid var(--border); border-radius: 2px; background: none; cursor: pointer; }
 .custom-color::-webkit-color-swatch-wrapper { padding: 0; }
 .custom-color::-webkit-color-swatch { border: none; border-radius: 1px; }
 
 /* ── PER-IMAGE PANEL ── */
 #img-section { border-top: 1px solid var(--border); padding-top: 18px; }
-.img-placeholder { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; line-height: 1.6; padding: 4px 0; }
-.img-name { font-size: 10px; color: var(--text-muted); letter-spacing: 0.06em; margin-bottom: 4px;
+.img-placeholder { font-size: 12px; color: var(--text-dim); letter-spacing: 0.06em; line-height: 1.6; padding: 4px 0; }
+.img-name { font-size: 12px; color: var(--text-muted); letter-spacing: 0.06em; margin-bottom: 4px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.img-meta { font-size: 9px; color: var(--text-dim); letter-spacing: 0.06em; margin-bottom: 10px; }
+.img-meta { font-size: 11px; color: var(--text-dim); letter-spacing: 0.06em; margin-bottom: 10px; }
 .rotate-btns { display: flex; gap: 4px; }
-.rot-btn { width: 28px; height: 24px; background: var(--surface-2); border: 1px solid var(--border);
+.rot-btn { min-width: 44px; min-height: 44px; background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 2px; color: var(--text-muted); font-family: inherit; font-size: 14px; cursor: pointer;
   display: flex; align-items: center; justify-content: center; transition: border-color 0.1s, color 0.1s; }
 .rot-btn:hover { border-color: var(--border-hover); color: var(--text); }
 .rot-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .enh-row { margin-bottom: 9px; }
 .enh-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; }
-.enh-label { font-size: 10px; color: var(--text-muted); letter-spacing: 0.06em; }
-.enh-val { font-size: 9px; font-weight: 700; color: var(--text-dim); min-width: 28px; text-align: right; letter-spacing: 0.06em; }
+.enh-label { font-size: 12px; color: var(--text-muted); letter-spacing: 0.06em; }
+.enh-val { font-size: 11px; font-weight: 700; color: var(--text-dim); min-width: 28px; text-align: right; letter-spacing: 0.06em; }
 .enh-val.lit { color: var(--accent); }
 .enh-sl { width: 100%; }
 .auto-btn { width: 100%; padding: 8px 10px; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 3px; color: var(--text-muted); font-family: inherit; font-size: 10px; font-weight: 700;
+  border-radius: 3px; color: var(--text-muted); font-family: inherit; font-size: 12px; font-weight: 700;
   letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; margin-top: 8px; margin-bottom: 6px;
   transition: border-color 0.12s, color 0.12s, background 0.12s; }
 .auto-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
 .auto-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.reset-link { background: none; border: none; color: var(--text-dim); font-family: inherit; font-size: 9px;
+.reset-link { background: none; border: none; color: var(--text-dim); font-family: inherit; font-size: 11px;
   letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; display: block; width: 100%;
   text-align: center; padding: 2px 0; transition: color 0.12s; }
 .reset-link:hover { color: var(--text-muted); }
@@ -118,7 +121,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
 .img-action-btns { display: flex; gap: 5px; margin-top: 6px; margin-bottom: 6px; }
 .img-action-btn { flex: 1; padding: 8px 6px; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 3px; color: var(--text-muted); font-family: inherit; font-size: 10px; font-weight: 700;
+  border-radius: 3px; color: var(--text-muted); font-family: inherit; font-size: 12px; font-weight: 700;
   letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
   transition: border-color 0.12s, color 0.12s, background 0.12s; }
 .img-action-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
@@ -167,14 +170,14 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
 .xopt-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
 .xopt-btns { display: flex; gap: 3px; }
-.xopt { padding: 3px 7px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 2px;
-  color: var(--text-muted); font-family: inherit; font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+.xopt { padding: 8px 10px; min-height: 36px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 2px;
+  color: var(--text-muted); font-family: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
   text-transform: uppercase; cursor: pointer; transition: all 0.1s; }
-.xopt.on  { background: var(--accent); border-color: var(--accent); color: #fff; }
+.xopt.on  { background: var(--accent); border-color: var(--accent); color: #1B1B28; }
 .xopt:hover:not(.on) { border-color: var(--border-hover); color: var(--text); }
 .xopt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.exp-btn { width: 100%; padding: 10px 12px; border-radius: 3px; font-family: inherit; font-size: 10px;
+.exp-btn { width: 100%; padding: 10px 12px; border-radius: 3px; font-family: inherit; font-size: 12px;
   font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer;
   transition: background 0.12s, opacity 0.12s, border-color 0.12s; border: none; }
 .exp-btn:disabled { opacity: 0.3; cursor: not-allowed; }
@@ -183,12 +186,12 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 .btn-img:not(:disabled):hover { background: #ff7244; }
 
 
-.clear-link { background: none; border: none; color: var(--text-dim); font-family: inherit; font-size: 9px;
+.clear-link { background: none; border: none; color: var(--text-dim); font-family: inherit; font-size: 11px;
   letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; text-align: center; padding: 2px 0; transition: color 0.12s; }
 .clear-link:hover { color: var(--text-muted); }
 .clear-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-.privacy-note { font-size: 9px; color: var(--text-dim); letter-spacing: 0.08em; text-align: center;
+.privacy-note { font-size: 11px; color: var(--text-dim); letter-spacing: 0.08em; text-align: center;
   margin-top: 4px; padding: 0 14px; line-height: 1.5; }
 .privacy-note span { opacity: 0.6; }
 
@@ -198,7 +201,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   background-size: 22px 22px; overflow-y: auto; overflow-x: hidden; display: flex;
   flex-direction: column; align-items: center; padding: 36px 36px 60px; position: relative; }
 
-#workspace.drag-active::after { content: 'Drop images'; position: fixed; top: 0; right: 0; bottom: 0; left: 200px;
+#workspace.drag-active::after { content: 'Drop images'; position: fixed; top: 0; right: 0; bottom: 0; left: 300px;
   background: var(--accent-dim); border: 2px dashed var(--accent); border-radius: 4px; display: flex;
   align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--accent);
   letter-spacing: 0.18em; text-transform: uppercase; z-index: 50; pointer-events: none; }
@@ -219,7 +222,10 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 .cell-plus { font-size: 16px; color: var(--border-hover); animation: breathe 2.6s ease-in-out infinite;
   pointer-events: none; line-height: 1; }
 .cell.empty.drag-on .cell-plus { animation: none; color: var(--accent); opacity: 1; }
-@media (prefers-reduced-motion: reduce) { .cell-plus { animation: none; opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) {
+  .cell-plus { animation: none; opacity: 0.3; }
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
 .cell.filled { cursor: grab; background: var(--surface-2); }
 .cell.filled:active { cursor: grabbing; }
 .cell.filled img { display: block; width: 100%; height: auto; pointer-events: none; user-select: none; }
@@ -232,13 +238,13 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   background: linear-gradient(to bottom, rgba(13,13,22,0.75) 0%, transparent 100%);
   opacity: 0; transition: opacity 0.15s; pointer-events: none; }
 .cell:hover .cell-toolbar, .cell.selected .cell-toolbar { opacity: 1; pointer-events: auto; }
-.cell-num { font-size: 8px; font-weight: 700; letter-spacing: 0.1em;
-  color: rgba(255,255,255,0.85); text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+.cell-num { font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+  color: #fff; background: rgba(0,0,0,0.55); padding: 1px 4px; border-radius: 2px; }
 .cell-drag { display: flex; flex-direction: column; gap: 2.5px; padding: 4px; cursor: grab; opacity: 0.7; }
 .cell-drag:active { cursor: grabbing; }
 .cell-drag span { display: block; width: 14px; height: 1.5px; background: rgba(255,255,255,0.9);
   border-radius: 1px; box-shadow: 0 1px 2px rgba(0,0,0,0.6); }
-.cell-rm { width: 20px; height: 20px; background: rgba(13,13,22,0.8);
+.cell-rm { width: 32px; height: 32px; background: rgba(13,13,22,0.8);
   border: 1px solid rgba(255,255,255,0.4); border-radius: 50%; color: rgba(255,255,255,0.9);
   font-size: 14px; line-height: 1; cursor: pointer; display: flex; align-items: center;
   justify-content: center; transition: background 0.12s, color 0.12s; }
@@ -249,11 +255,11 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   justify-content: center; gap: 12px; pointer-events: none; z-index: 0; }
 #empty-msg.gone { display: none; }
 .empty-icon { font-size: 36px; opacity: 0.1; }
-.empty-head { font-size: 12px; color: var(--text-muted); letter-spacing: 0.06em; text-align: center; }
-.empty-body { font-size: 10px; color: var(--text-dim); letter-spacing: 0.04em; text-align: center; line-height: 1.7; }
+.empty-head { font-size: 15px; color: var(--text-muted); letter-spacing: 0.06em; text-align: center; }
+.empty-body { font-size: 13px; color: var(--text-dim); letter-spacing: 0.04em; text-align: center; line-height: 1.7; }
 
 #toast { position: fixed; bottom: 20px; right: 20px; background: var(--surface-2);
-  border: 1px solid var(--border); border-radius: 3px; padding: 9px 14px; font-size: 10px;
+  border: 1px solid var(--border); border-radius: 3px; padding: 9px 14px; font-size: 12px;
   color: var(--text-muted); letter-spacing: 0.08em; opacity: 0; transform: translateY(6px);
   transition: opacity 0.18s, transform 0.18s; pointer-events: none; z-index: 300; text-transform: uppercase; }
 #toast.show { opacity: 1; transform: translateY(0); }
@@ -270,30 +276,66 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 #install-bar button:hover { background: #ff7244; }
 #install-dismiss { background: none !important; color: var(--text-dim) !important; padding: 6px 8px !important; }
 
+@media (max-width: 640px) {
+  #sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 500;
+    transform: translateX(-100%); transition: transform 0.26s cubic-bezier(.4,0,.2,1);
+    width: 250px; min-width: 250px; box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+  }
+  #sidebar.open { transform: translateX(0); }
+
+  #sidebar-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 499;
+  }
+  #sidebar-overlay.open { display: block; }
+
+  #workspace { padding: 20px 16px 60px; }
+  #workspace.drag-active::after { left: 0; }
+
+  #sidebar-fab {
+    display: flex; position: fixed; bottom: 22px; right: 18px; z-index: 498;
+    padding: 12px 20px; border-radius: 999px; border: none;
+    background: var(--accent); color: #fff; font-size: 12px; font-weight: 700;
+    letter-spacing: 0.08em; cursor: pointer; align-items: center; gap: 6px;
+    font-family: inherit; text-transform: uppercase;
+    box-shadow: 0 4px 16px rgba(255,92,43,0.5); transition: background 0.15s;
+  }
+  #sidebar-fab:hover { background: #ff7244; }
+  #install-bar.show ~ #sidebar-fab,
+  body:has(#install-bar.show) #sidebar-fab { bottom: 66px; }
+}
+
+@media (min-width: 641px) {
+  #sidebar-overlay { display: none !important; }
+  #sidebar-fab { display: none !important; }
+}
+
 </style>
 </head>
 <body>
+<div id="sidebar-overlay"></div>
+<button id="sidebar-fab" aria-label="Open settings">+ Add images</button>
 <div id="app">
-  <aside id="sidebar">
+  <aside id="sidebar" aria-label="Settings panel">
     <div class="logo">
-      <div class="logo-word">Picstack <span class="save-dot" id="save-dot"></span></div>
+      <h1 class="logo-word">Picstack <span class="save-dot" id="save-dot"></span></h1>
       <div class="logo-sub">stack · enhance · export</div>
     </div>
 
-    <div class="section">
-      <div class="section-label">Images</div>
+    <div class="section" role="group" aria-labelledby="lbl-images">
+      <h2 class="section-label" id="lbl-images">Images</h2>
       <button class="add-btn" id="add-btn"><span aria-hidden="true">+</span> Add images</button>
-      <div class="img-count" id="img-count">0 images</div>
-      <div class="img-total-size" id="img-total-size"></div>
+      <div class="img-count" id="img-count" aria-live="polite">0 images</div>
+      <div class="img-total-size" id="img-total-size" aria-live="polite"></div>
     </div>
 
-    <div class="section">
-      <div class="section-label">Layout</div>
+    <div class="section" role="group" aria-labelledby="lbl-layout">
+      <h2 class="section-label" id="lbl-layout">Layout</h2>
       <div class="ctrl-row" style="margin-bottom:10px">
         <span class="ctrl-label">Direction</span>
         <div class="xopt-btns">
-          <button class="xopt on" id="dir-v" title="Stack vertically">↕ V</button>
-          <button class="xopt"    id="dir-h" title="Stack horizontally">↔ H</button>
+          <button class="xopt on" id="dir-v" title="Stack vertically" aria-label="Stack vertically">↕ V</button>
+          <button class="xopt"    id="dir-h" title="Stack horizontally" aria-label="Stack horizontally">↔ H</button>
         </div>
       </div>
       <div class="ctrl-row">
@@ -312,8 +354,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       </div>
     </div>
 
-    <div class="section">
-      <div class="section-label">Background</div>
+    <div class="section" role="group" aria-labelledby="lbl-bg">
+      <h2 class="section-label" id="lbl-bg">Background</h2>
       <div class="swatch-row">
         <button class="swatch on" style="background:#ffffff" data-bg="#ffffff" aria-label="White"></button>
         <button class="swatch" style="background:#000000" data-bg="#000000" aria-label="Black"></button>
@@ -323,8 +365,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       </div>
     </div>
 
-    <div class="section" id="img-section">
-      <div class="section-label">Selected image</div>
+    <div class="section" id="img-section" role="group" aria-labelledby="lbl-selected">
+      <h2 class="section-label" id="lbl-selected">Selected image</h2>
       <div class="img-placeholder" id="img-placeholder">Click an image to adjust brightness, contrast &amp; sharpness</div>
       <div id="img-controls" style="display:none">
         <div class="img-name" id="img-panel-name"></div>
@@ -354,8 +396,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
         </div>
         <button class="auto-btn" id="img-auto">✦ Auto enhance</button>
         <div class="img-action-btns">
-          <button class="img-action-btn" id="img-crop">⬚ Crop</button>
-          <button class="img-action-btn" id="img-undo" disabled>↩ Undo</button>
+          <button class="img-action-btn" id="img-crop" aria-label="Crop image">⬚ Crop</button>
+          <button class="img-action-btn" id="img-undo" disabled aria-label="Undo last change">↩ Undo</button>
         </div>
         <button class="reset-link" id="img-reset">Reset to original</button>
       </div>
@@ -364,46 +406,46 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     <div class="sidebar-grow"></div>
 
     <div class="export-zone">
-      <div class="xopt-row">
-        <span class="ctrl-label">Quality</span>
+      <div class="xopt-row" role="group" aria-labelledby="lbl-quality">
+        <span class="ctrl-label" id="lbl-quality">Quality</span>
         <div class="xopt-btns">
-          <button class="xopt"    data-res="1" title="~700px wide — fast sharing">Lo</button>
-          <button class="xopt on" data-res="2" title="~1400px — balanced">Med</button>
-          <button class="xopt"    data-res="3" title="~2100px — maximum detail">Hi</button>
+          <button class="xopt"    data-res="1" aria-label="Low quality, around 700px wide" title="~700px wide — fast sharing">Lo</button>
+          <button class="xopt on" data-res="2" aria-label="Medium quality, around 1400px wide" title="~1400px — balanced">Med</button>
+          <button class="xopt"    data-res="3" aria-label="High quality, around 2100px wide" title="~2100px — maximum detail">Hi</button>
         </div>
       </div>
-      <div class="xopt-row" style="margin-bottom:6px">
-        <span class="ctrl-label">Format</span>
+      <div class="xopt-row" style="margin-bottom:6px" role="group" aria-labelledby="lbl-format">
+        <span class="ctrl-label" id="lbl-format">Format</span>
         <div class="xopt-btns">
-          <button class="xopt on" data-fmt="jpeg" title="Smaller file, good for photos">JPG</button>
-          <button class="xopt"    data-fmt="png"  title="Lossless, better for screenshots">PNG</button>
+          <button class="xopt on" data-fmt="jpeg" aria-label="JPEG format, smaller file size" title="Smaller file, good for photos">JPG</button>
+          <button class="xopt"    data-fmt="png"  aria-label="PNG format, lossless" title="Lossless, better for screenshots">PNG</button>
         </div>
       </div>
-      <div class="xopt-row" style="margin-bottom:6px" id="compress-row">
-        <span class="ctrl-label">Compress</span>
+      <div class="xopt-row" style="margin-bottom:6px" id="compress-row" role="group" aria-labelledby="lbl-compress">
+        <span class="ctrl-label" id="lbl-compress">Compress</span>
         <div class="xopt-btns">
-          <button class="xopt on" id="compress-off" title="High quality export (default)">Off</button>
-          <button class="xopt"    id="compress-on"  title="Smart JPEG compression — ~25% smaller, no visible quality loss">On</button>
+          <button class="xopt on" id="compress-off" aria-label="Compression off, high quality" title="High quality export (default)">Off</button>
+          <button class="xopt"    id="compress-on"  aria-label="Compression on, smaller file size" title="Smart JPEG compression — ~25% smaller, no visible quality loss">On</button>
         </div>
       </div>
-      <div class="xopt-row" style="margin-bottom:6px" id="maxsize-row">
-        <span class="ctrl-label">Max size</span>
+      <div class="xopt-row" style="margin-bottom:6px" id="maxsize-row" role="group" aria-labelledby="lbl-maxsize">
+        <span class="ctrl-label" id="lbl-maxsize">Max size</span>
         <div class="xopt-btns">
-          <button class="xopt on" data-maxsize="0"       title="No size limit">Off</button>
-          <button class="xopt"    data-maxsize="2097152" title="Compress to under 2 MB">2MB</button>
-          <button class="xopt"    data-maxsize="1048576" title="Compress to under 1 MB">1MB</button>
-          <button class="xopt"    data-maxsize="512000"  title="Compress to under 500 KB">500K</button>
+          <button class="xopt on" data-maxsize="0"       aria-label="No file size limit" title="No size limit">Off</button>
+          <button class="xopt"    data-maxsize="2097152" aria-label="Limit to 2 megabytes" title="Compress to under 2 MB">2MB</button>
+          <button class="xopt"    data-maxsize="1048576" aria-label="Limit to 1 megabyte" title="Compress to under 1 MB">1MB</button>
+          <button class="xopt"    data-maxsize="512000"  aria-label="Limit to 500 kilobytes" title="Compress to under 500 KB">500K</button>
         </div>
       </div>
-      <button class="exp-btn btn-img" id="dl-img" disabled>↓ Image</button>
-      <div class="xopt-row" style="margin-bottom:4px">
-        <span class="ctrl-label">PDF layout</span>
+      <button class="exp-btn btn-img" id="dl-img" disabled aria-label="Download image">↓ Image</button>
+      <div class="xopt-row" style="margin-bottom:4px" role="group" aria-labelledby="lbl-pdflayout">
+        <span class="ctrl-label" id="lbl-pdflayout">PDF layout</span>
         <div class="xopt-btns">
-          <button class="xopt on" id="pmt-combined" title="All images on one page">Single</button>
-          <button class="xopt"    id="pmt-pages"    title="One image per page">Per image</button>
+          <button class="xopt on" id="pmt-combined" aria-label="Single page PDF" title="All images on one page">Single</button>
+          <button class="xopt"    id="pmt-pages"    aria-label="One image per PDF page" title="One image per page">Per image</button>
         </div>
       </div>
-      <button class="exp-btn" id="dl-pdf" disabled style="margin-bottom:2px">↓ PDF</button>
+      <button class="exp-btn" id="dl-pdf" disabled style="margin-bottom:2px" aria-label="Download PDF">↓ PDF</button>
       <button class="clear-link" id="clear-all">Clear all</button>
     </div>
   </aside>
@@ -419,7 +461,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   </main>
 </div>
 
-<div id="crop-modal" role="dialog" aria-modal="true" aria-label="Crop image">
+<div id="crop-modal" role="dialog" aria-modal="true" aria-labelledby="crop-title">
   <div id="crop-container">
     <div id="crop-header">
       <span id="crop-title">Crop image</span>
@@ -445,6 +487,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   </div>
 </div>
 
+<div id="sr-announcer" aria-live="polite" aria-atomic="true" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap"></div>
 <canvas id="exp-canvas" style="display:none" aria-hidden="true"></canvas>
 <input type="file" id="file-input" accept="image/*,.heic,.heif" multiple style="display:none" aria-hidden="true">
 <div id="toast" role="status" aria-live="polite"></div>
@@ -457,6 +500,20 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 </div>
 
 <script>
+// ── Mobile sidebar overlay ──
+(function () {
+  var fab     = document.getElementById('sidebar-fab');
+  var overlay = document.getElementById('sidebar-overlay');
+  var sidebar = document.getElementById('sidebar');
+  function open()  { sidebar.classList.add('open'); overlay.classList.add('open'); }
+  function close() { sidebar.classList.remove('open'); overlay.classList.remove('open'); }
+  if (fab)     fab.addEventListener('click', open);
+  if (overlay) overlay.addEventListener('click', close);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && sidebar.classList.contains('open')) close();
+  });
+})();
+
 (function () {
   // ── State ──
   var imgs    = [];
@@ -753,8 +810,14 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   }
 
   // ── Selection ──
+  function announce(msg) {
+    var el = document.getElementById('sr-announcer');
+    if (el) { el.textContent = ''; setTimeout(function () { el.textContent = msg; }, 50); }
+  }
+
   function selectImg(i) {
     sel = i; render();
+    announce('Image ' + (i + 1) + ' selected: ' + (imgs[i].name || 'untitled'));
     var e = imgs[i].enhance;
     imgPlaceholder.style.display = 'none'; imgControls.style.display = 'block';
     var name = imgs[i].name || ('Image ' + (i + 1));
@@ -815,7 +878,10 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       render(); syncCount(); syncTotalSize(); syncButtons(); saveState(); showToast('Image removed');
     });
     tb.appendChild(rm); cell.appendChild(tb);
+    cell.tabIndex = 0;
+    cell.setAttribute('aria-label', 'Image ' + (i + 1) + ': ' + (imgs[i].name || 'untitled') + '. Press Enter to select.');
     cell.addEventListener('click', function () { if (sel === i) deselect(); else selectImg(i); });
+    cell.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cell.click(); } });
     dragHandle.addEventListener('mousedown', function () { cell.draggable = true; });
     cell.addEventListener('dragstart', function (e) {
       if (e.dataTransfer.types && Array.prototype.indexOf.call(e.dataTransfer.types,'Files') !== -1) return;
@@ -873,8 +939,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   addBtn.addEventListener('click', function () { fileInput.value = ''; fileInput.click(); });
   fileInput.addEventListener('change', function () { if (fileInput.files.length) loadFiles(fileInput.files); });
 
-  gapSlider.addEventListener('input', function () { gap = parseInt(gapSlider.value, 10); gapVal.textContent = gap + 'px'; render(); saveState(); });
-  widthSlider.addEventListener('input', function () { stackW = parseInt(widthSlider.value, 10); widthVal.textContent = stackW; render(); saveState(); });
+  gapSlider.addEventListener('input', function () { gap = parseInt(gapSlider.value, 10); gapVal.textContent = gap + 'px'; gapSlider.setAttribute('aria-valuetext', gap + ' pixels'); render(); saveState(); });
+  widthSlider.addEventListener('input', function () { stackW = parseInt(widthSlider.value, 10); widthVal.textContent = stackW; widthSlider.setAttribute('aria-valuetext', stackW + ' pixels'); render(); saveState(); });
 
   function setDir(d) {
     stackDir = d;
@@ -1213,8 +1279,10 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   var cropBox      = document.getElementById('crop-box');
   var cropDimsLbl  = document.getElementById('crop-dims-label');
 
+  var cropPrevFocus = null;
   function openCrop(idx) {
     cropIdx = idx;
+    cropPrevFocus = document.activeElement;
     cropImgEl.src = imgs[idx].dataUrl;
     cropImgEl.onload = function () {
       cropImgW = cropImgEl.offsetWidth;
@@ -1223,9 +1291,13 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       updateCropBox(); updateCropDims();
     };
     cropModal.classList.add('open');
+    document.getElementById('crop-cancel-btn').focus();
   }
 
-  function closeCrop() { cropModal.classList.remove('open'); cropDragMode = null; }
+  function closeCrop() {
+    cropModal.classList.remove('open'); cropDragMode = null;
+    if (cropPrevFocus) { cropPrevFocus.focus(); cropPrevFocus = null; }
+  }
 
   function updateCropBox() {
     cropBox.style.left = cropX + 'px'; cropBox.style.top = cropY + 'px';
@@ -1292,7 +1364,13 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   });
 
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && cropModal.classList.contains('open')) closeCrop();
+    if (e.key === 'Escape' && cropModal.classList.contains('open')) { closeCrop(); return; }
+    if (e.key === 'Tab' && cropModal.classList.contains('open')) {
+      var focusable = cropModal.querySelectorAll('button:not([disabled])');
+      var first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last.focus(); } }
+      else            { if (document.activeElement === last)  { e.preventDefault(); first.focus(); } }
+    }
   });
 
   // ── Service worker ──
