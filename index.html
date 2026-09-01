@@ -88,6 +88,13 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   border: 2px solid var(--border); border-radius: 2px; background: none; cursor: pointer; }
 .custom-color::-webkit-color-swatch-wrapper { padding: 0; }
 .custom-color::-webkit-color-swatch { border: none; border-radius: 1px; }
+.swatch-checker { background: repeating-conic-gradient(#8a8a9a 0% 25%, #d8d8e2 0% 50%) 0 0/9px 9px !important; }
+.cell.filled img.alpha-check { background: repeating-conic-gradient(#b8b8c4 0% 25%, #ececf2 0% 50%) 0 0/16px 16px; }
+.num-input { width: 78px; padding: 7px 8px; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 2px; color: var(--text); font-family: inherit; font-size: 12px; text-align: right; }
+.num-input::placeholder { color: var(--text-dim); }
+.num-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.num-input::-webkit-outer-spin-button, .num-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 /* ── PER-IMAGE PANEL ── */
 #img-section { border-top: 1px solid var(--border); padding-top: 18px; }
@@ -364,6 +371,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
         <button class="swatch" style="background:#000000" data-bg="#000000" aria-label="Black"></button>
         <button class="swatch" style="background:#F5F2EE" data-bg="#F5F2EE" aria-label="Paper"></button>
         <button class="swatch" style="background:#1A1A28" data-bg="#1A1A28" aria-label="Dark"></button>
+        <button class="swatch swatch-checker" data-bg="transparent" aria-label="Transparent" title="Transparent — exports as PNG"></button>
         <label title="Custom"><input type="color" class="custom-color" id="custom-bg" value="#ffffff" aria-label="Custom background"></label>
       </div>
     </div>
@@ -398,6 +406,22 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
           <input type="range" class="sl enh-sl" id="e-sh" min="0" max="100" value="0" aria-label="Sharpen">
         </div>
         <button class="auto-btn" id="img-auto">✦ Auto enhance</button>
+        <button class="auto-btn" id="img-removebg" style="margin-top:0">✂ Remove background</button>
+        <div id="bgfill-controls" style="display:none">
+          <div class="enh-row">
+            <div class="enh-header"><span class="enh-label">Edge tolerance</span><span class="enh-val" id="bg-tol-val">30</span></div>
+            <input type="range" class="sl enh-sl" id="bg-tol" min="5" max="90" value="30" aria-label="Background removal tolerance">
+          </div>
+          <div class="ctrl-label" style="margin-bottom:7px">New background</div>
+          <div class="swatch-row" style="margin-bottom:8px" id="fill-swatches" role="group" aria-label="New background color">
+            <button class="swatch swatch-checker on" data-fill="transparent" aria-label="Transparent" title="Transparent — exports as PNG"></button>
+            <button class="swatch" style="background:#ffffff" data-fill="#ffffff" aria-label="White"></button>
+            <button class="swatch" style="background:#000000" data-fill="#000000" aria-label="Black"></button>
+            <button class="swatch" style="background:#F5F2EE" data-fill="#F5F2EE" aria-label="Paper"></button>
+            <button class="swatch" style="background:#1A1A28" data-fill="#1A1A28" aria-label="Dark"></button>
+            <label title="Custom fill"><input type="color" class="custom-color" id="custom-fill" value="#ffffff" aria-label="Custom new background color"></label>
+          </div>
+        </div>
         <div class="img-action-btns">
           <button class="img-action-btn" id="img-crop" aria-label="Crop image">⬚ Crop</button>
           <button class="img-action-btn" id="img-undo" disabled aria-label="Undo last change">↩ Undo</button>
@@ -435,9 +459,16 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
         <span class="ctrl-label" id="lbl-maxsize">Max size</span>
         <div class="xopt-btns">
           <button class="xopt on" data-maxsize="0"       aria-label="No file size limit" title="No size limit">Off</button>
-          <button class="xopt"    data-maxsize="2097152" aria-label="Limit to 2 megabytes" title="Compress to under 2 MB">2MB</button>
           <button class="xopt"    data-maxsize="1048576" aria-label="Limit to 1 megabyte" title="Compress to under 1 MB">1MB</button>
           <button class="xopt"    data-maxsize="512000"  aria-label="Limit to 500 kilobytes" title="Compress to under 500 KB">500K</button>
+          <button class="xopt"    data-maxsize="204800"  aria-label="Limit to 200 kilobytes" title="Compress to under 200 KB">200K</button>
+        </div>
+      </div>
+      <div class="xopt-row" style="margin-bottom:6px" id="maxsize-custom-row">
+        <span class="ctrl-label" id="lbl-maxsize-custom">Custom size</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="number" class="num-input" id="maxsize-custom" min="10" max="20480" placeholder="e.g. 150" aria-label="Custom max size in kilobytes">
+          <span class="ctrl-label">KB</span>
         </div>
       </div>
       <button class="exp-btn btn-img" id="dl-img" disabled aria-label="Download image">↓ Image</button>
@@ -626,7 +657,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
   function saveImages() {
     var payload = imgs.map(function (im) {
-      return { id: im.id, dataUrl: im.dataUrl, name: im.name, w: im.w, h: im.h, size: im.size, enhance: im.enhance };
+      return { id: im.id, dataUrl: im.dataUrl, name: im.name, w: im.w, h: im.h, size: im.size, enhance: im.enhance,
+               cut: im.cut || null, cutoutDataUrl: im.cutoutDataUrl || null };
     });
     dbPut('imgs', payload);
     saveDot.className = 'save-dot saved';
@@ -646,11 +678,23 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       if (s.exportFmt) exportFmt = s.exportFmt;
       if (s.pdfMode)   pdfMode   = s.pdfMode;
       if (s.compress)  { compress = s.compress; document.getElementById('compress-on').classList.toggle('on', compress); document.getElementById('compress-off').classList.toggle('on', !compress); }
-      if (s.maxSize)   { maxSize = s.maxSize; document.querySelectorAll('[data-maxsize]').forEach(function (b) { b.classList.toggle('on', parseInt(b.dataset.maxsize, 10) === maxSize); }); }
+      if (s.maxSize)   {
+        maxSize = s.maxSize;
+        var msMatched = false;
+        document.querySelectorAll('[data-maxsize]').forEach(function (b) {
+          var on = parseInt(b.dataset.maxsize, 10) === maxSize;
+          if (on) msMatched = true;
+          b.classList.toggle('on', on);
+        });
+        if (!msMatched) {
+          document.querySelector('[data-maxsize="0"]').classList.remove('on');
+          document.getElementById('maxsize-custom').value = Math.round(maxSize / 1024);
+        }
+      }
       gapSlider.value = gap; gapVal.textContent = gap + 'px';
       widthSlider.value = stackW; widthVal.textContent = stackW;
-      document.querySelectorAll('.swatch').forEach(function (sw) { sw.classList.toggle('on', sw.dataset.bg === bg); });
-      document.getElementById('custom-bg').value = bg;
+      document.querySelectorAll('.swatch[data-bg]').forEach(function (sw) { sw.classList.toggle('on', sw.dataset.bg === bg); });
+      if (bg !== 'transparent') document.getElementById('custom-bg').value = bg;
       document.querySelectorAll('[data-res]').forEach(function (b) { b.classList.toggle('on', parseInt(b.dataset.res) === exportRes); });
       document.querySelectorAll('[data-fmt]').forEach(function (b) { b.classList.toggle('on', b.dataset.fmt === exportFmt); });
       document.getElementById('pmt-combined').classList.toggle('on', pdfMode === 'combined');
@@ -781,8 +825,11 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
   // ── Undo helpers ──
   function pushUndo(idx) {
-    if (!imgs[idx].undoStack) imgs[idx].undoStack = [];
-    imgs[idx].undoStack.push(imgs[idx].dataUrl);
+    var im = imgs[idx];
+    if (!im.undoStack) im.undoStack = [];
+    im.undoStack.push({ dataUrl: im.dataUrl,
+                        cut: im.cut ? JSON.parse(JSON.stringify(im.cut)) : null,
+                        cutoutDataUrl: im.cutoutDataUrl || null });
     if (sel === idx) syncUndoBtn();
   }
   function syncUndoBtn() {
@@ -792,8 +839,9 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   }
 
   // ── Rotate ──
-  function rotateImage(idx, deg) {
-    pushUndo(idx);
+  function isTransparentCut(im) { return !!(im.cut && (!im.cut.fill || im.cut.fill === 'transparent')); }
+
+  function rotateUrl(url, deg, alpha, cb) {
     var im = new Image();
     im.onload = function () {
       var c = document.createElement('canvas'), ctx = c.getContext('2d'), rad = deg * Math.PI / 180;
@@ -801,16 +849,106 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       else { c.width = im.width; c.height = im.height; }
       ctx.save(); ctx.translate(c.width / 2, c.height / 2); ctx.rotate(rad);
       ctx.drawImage(im, -im.width / 2, -im.height / 2); ctx.restore();
-      imgs[idx].dataUrl = c.toDataURL('image/jpeg', 0.96);
-      imgs[idx].w = c.width; imgs[idx].h = c.height; imgs[idx].size = calcSize(imgs[idx].dataUrl);
-      render(); saveState(); syncTotalSize();
+      cb(alpha ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.96), c.width, c.height);
     };
-    im.src = imgs[idx].dataUrl;
+    im.src = url;
+  }
+
+  function rotateImage(idx, deg) {
+    pushUndo(idx);
+    var im = imgs[idx];
+    rotateUrl(im.dataUrl, deg, isTransparentCut(im), function (url, w, h) {
+      im.dataUrl = url; im.w = w; im.h = h; im.size = calcSize(url);
+      function finish() { render(); saveState(); syncTotalSize(); if (sel === idx) selectImg(idx); }
+      if (im.cut && im.cutoutDataUrl) {
+        rotateUrl(im.cutoutDataUrl, deg, true, function (u2) {
+          im.cutoutDataUrl = u2;
+          rotateUrl(im.cut.src, deg, false, function (u3) { im.cut.src = u3; finish(); });
+        });
+      } else finish();
+    });
   }
 
   // ── Enhance ──
   function imgFilter(e) {
     return 'brightness(' + (1 + e.br/100).toFixed(2) + ') contrast(' + (1 + e.co/100).toFixed(2) + ') saturate(' + (1 + e.sa/100).toFixed(2) + ')';
+  }
+
+  // ── Background removal ──
+  // Region-grows from the image corners, comparing each pixel to the
+  // neighbour it was reached from — so gradients and uneven lighting flow
+  // through, while sharp subject edges stop the fill. Runs entirely on-device.
+  function removeBackground(srcUrl, tol, cb) {
+    var img = new Image();
+    img.onload = function () {
+      var MAXD = 3600, w = img.width, h = img.height;
+      if (Math.max(w, h) > MAXD) {
+        var sc = MAXD / Math.max(w, h);
+        w = Math.round(w * sc); h = Math.round(h * sc);
+      }
+      var c = document.createElement('canvas'); c.width = w; c.height = h;
+      var ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      // if the working canvas was downscaled, hand back a matching source so
+      // every stored layer (src / cutout / composite) shares one resolution
+      var normSrc = (w !== img.width || h !== img.height) ? c.toDataURL('image/jpeg', 0.96) : null;
+      var id = ctx.getImageData(0, 0, w, h), d = id.data;
+      var thr = tol * tol * 3;
+      function dist2(p, q) {
+        var i = p * 4, j = q * 4;
+        var dr = d[i] - d[j], dg = d[i+1] - d[j+1], db = d[i+2] - d[j+2];
+        return dr*dr + dg*dg + db*db;
+      }
+      // visited: 0 = unseen, 1 = removed, 2 = checked and kept
+      var visited = new Uint8Array(w * h);
+      var queue = new Uint32Array(w * h), qs = 0, qe = 0;
+      // seed only corners that loosely agree with another corner — a corner
+      // covered by the subject then stays out, so the fill can't eat into it
+      var corners = [0, w - 1, (h - 1) * w, w * h - 1];
+      var seeds = corners.filter(function (p, i) {
+        return corners.some(function (q, j) { return i !== j && dist2(p, q) <= thr * 6; });
+      });
+      if (!seeds.length) seeds = corners;
+      seeds.forEach(function (p) { if (!visited[p]) { visited[p] = 1; queue[qe++] = p; } });
+      function tryPush(p, from) {
+        if (visited[p] === 1) return; // already removed; rejected (2) may retry from another neighbour
+        if (dist2(p, from) > thr) { visited[p] = 2; return; }
+        visited[p] = 1; queue[qe++] = p;
+      }
+      while (qs < qe) {
+        var p = queue[qs++], py = (p / w) | 0, px = p - py * w;
+        if (px > 0)     tryPush(p - 1, p);
+        if (px < w - 1) tryPush(p + 1, p);
+        if (py > 0)     tryPush(p - w, p);
+        if (py < h - 1) tryPush(p + w, p);
+      }
+      var removed = 0;
+      for (var q = 0; q < w * h; q++) if (visited[q] === 1) { d[q * 4 + 3] = 0; removed++; }
+      // soften the cut edge: removed pixels touching kept ones get partial alpha
+      for (var y2 = 1; y2 < h - 1; y2++) {
+        for (var x2 = 1; x2 < w - 1; x2++) {
+          var p2 = y2 * w + x2;
+          if (visited[p2] !== 1) continue;
+          if (visited[p2-1] === 2 || visited[p2+1] === 2 || visited[p2-w] === 2 || visited[p2+w] === 2) d[p2 * 4 + 3] = 110;
+        }
+      }
+      ctx.putImageData(id, 0, 0);
+      cb(c.toDataURL('image/png'), w, h, normSrc, Math.round(removed / (w * h) * 100));
+    };
+    img.src = srcUrl;
+  }
+
+  function applyFill(cutUrl, fill, cb) {
+    if (!fill || fill === 'transparent') { cb(cutUrl); return; }
+    var img = new Image();
+    img.onload = function () {
+      var c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+      var ctx = c.getContext('2d');
+      ctx.fillStyle = fill; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0);
+      cb(c.toDataURL('image/jpeg', 0.96));
+    };
+    img.src = cutUrl;
   }
 
   // ── Selection ──
@@ -840,6 +978,14 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     eCo.value = e.co; eCoVal.textContent = fmtV(e.co); eCoVal.classList.toggle('lit', e.co !== 0);
     eSa.value = e.sa; eSaVal.textContent = fmtV(e.sa); eSaVal.classList.toggle('lit', e.sa !== 0);
     eSh.value = e.sh; eShVal.textContent = e.sh;        eShVal.classList.toggle('lit', e.sh !== 0);
+    var cut = imgs[i].cut;
+    document.getElementById('bgfill-controls').style.display = cut ? 'block' : 'none';
+    if (cut) {
+      var tolEl = document.getElementById('bg-tol');
+      tolEl.value = cut.tol; document.getElementById('bg-tol-val').textContent = cut.tol;
+      var fill = cut.fill || 'transparent';
+      document.querySelectorAll('#fill-swatches .swatch').forEach(function (s) { s.classList.toggle('on', s.dataset.fill === fill); });
+    }
     syncUndoBtn();
   }
 
@@ -865,7 +1011,9 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     cell.dataset.idx = i; cell.setAttribute('role', 'listitem');
     var imgEl = document.createElement('img');
     imgEl.src = imgs[i].dataUrl; imgEl.alt = imgs[i].name || ('Image ' + (i + 1));
-    imgEl.style.filter = imgFilter(imgs[i].enhance); cell.appendChild(imgEl);
+    imgEl.style.filter = imgFilter(imgs[i].enhance);
+    if (isTransparentCut(imgs[i])) imgEl.classList.add('alpha-check');
+    cell.appendChild(imgEl);
     var tb = document.createElement('div'); tb.className = 'cell-toolbar';
     var left = document.createElement('div'); left.style.cssText = 'display:flex;align-items:center;gap:6px';
     var num = document.createElement('span'); num.className = 'cell-num'; num.setAttribute('aria-hidden','true');
@@ -961,11 +1109,81 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   document.getElementById('dir-v').addEventListener('click', function () { setDir('v'); });
   document.getElementById('dir-h').addEventListener('click', function () { setDir('h'); });
 
-  document.querySelectorAll('.swatch').forEach(function (sw) {
-    sw.addEventListener('click', function () { bg = sw.dataset.bg; document.querySelectorAll('.swatch').forEach(function (s) { s.classList.remove('on'); }); sw.classList.add('on'); saveState(); });
+  function setFormat(fmt) {
+    exportFmt = fmt;
+    document.querySelectorAll('[data-fmt]').forEach(function (b) { b.classList.toggle('on', b.dataset.fmt === fmt); });
+    syncCompressRow();
+  }
+
+  document.querySelectorAll('.swatch[data-bg]').forEach(function (sw) {
+    sw.addEventListener('click', function () {
+      bg = sw.dataset.bg;
+      document.querySelectorAll('.swatch[data-bg]').forEach(function (s) { s.classList.remove('on'); });
+      sw.classList.add('on');
+      if (bg === 'transparent' && exportFmt === 'jpeg') {
+        setFormat('png');
+        showToast('Transparent background — format set to PNG');
+      }
+      saveState();
+    });
     sw.tabIndex = 0; sw.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sw.click(); } });
   });
-  document.getElementById('custom-bg').addEventListener('input', function (e) { bg = e.target.value; document.querySelectorAll('.swatch').forEach(function (s) { s.classList.remove('on'); }); saveState(); });
+  document.getElementById('custom-bg').addEventListener('input', function (e) { bg = e.target.value; document.querySelectorAll('.swatch[data-bg]').forEach(function (s) { s.classList.remove('on'); }); saveState(); });
+
+  // ── Remove background controls ──
+  var removeBgBtn = document.getElementById('img-removebg');
+  var bgTol = document.getElementById('bg-tol'), bgTolVal = document.getElementById('bg-tol-val');
+
+  function runCut(idx, firstRun) {
+    var im = imgs[idx];
+    removeBgBtn.disabled = true; removeBgBtn.textContent = '… removing';
+    removeBackground(im.cut.src, im.cut.tol, function (cutUrl, w, h, normSrc, pct) {
+      if (normSrc) im.cut.src = normSrc;
+      im.cutoutDataUrl = cutUrl;
+      applyFill(cutUrl, im.cut.fill, function (url) {
+        im.dataUrl = url; im.w = w; im.h = h; im.size = calcSize(url);
+        removeBgBtn.disabled = false; removeBgBtn.textContent = '✂ Remove background';
+        render(); saveState(); syncTotalSize();
+        if (sel === idx) selectImg(idx);
+        if (pct < 1) showToast('No background detected (' + pct + '% removed) — raise Edge tolerance');
+        else if (firstRun) showToast('Background removed (' + pct + '%) — pick a new one below');
+      });
+    });
+  }
+
+  removeBgBtn.addEventListener('click', function () {
+    if (sel === null || removeBgBtn.disabled) return;
+    var im = imgs[sel], firstRun = !im.cut;
+    if (firstRun) pushUndo(sel);
+    im.cut = { src: im.cut ? im.cut.src : im.dataUrl, tol: parseInt(bgTol.value, 10) || 30, fill: 'transparent' };
+    runCut(sel, firstRun);
+  });
+
+  var tolTimer = null;
+  bgTol.addEventListener('input', function () {
+    bgTolVal.textContent = bgTol.value;
+    if (sel === null || !imgs[sel].cut) return;
+    imgs[sel].cut.tol = parseInt(bgTol.value, 10);
+    if (tolTimer) clearTimeout(tolTimer);
+    tolTimer = setTimeout(function () { if (sel !== null && imgs[sel] && imgs[sel].cut) runCut(sel); }, 200);
+  });
+
+  function setFill(fill) {
+    if (sel === null || !imgs[sel].cut || !imgs[sel].cutoutDataUrl) return;
+    var idx = sel, im = imgs[idx];
+    im.cut.fill = fill;
+    applyFill(im.cutoutDataUrl, fill, function (url) {
+      im.dataUrl = url; im.size = calcSize(url);
+      render(); saveState(); syncTotalSize();
+      if (sel === idx) selectImg(idx);
+    });
+  }
+
+  document.querySelectorAll('#fill-swatches .swatch').forEach(function (sw) {
+    sw.addEventListener('click', function () { setFill(sw.dataset.fill); });
+    sw.tabIndex = 0; sw.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sw.click(); } });
+  });
+  document.getElementById('custom-fill').addEventListener('change', function (e) { setFill(e.target.value); });
 
   clearAllBtn.addEventListener('click', function () {
     if (!imgs.length) return; if (!confirm('Remove all images?')) return;
@@ -999,13 +1217,34 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     document.getElementById('compress-off').classList.remove('on');
     saveState(); showToast('Smart compress on — ~25% smaller JPEG');
   });
+  var msCustom = document.getElementById('maxsize-custom');
   document.querySelectorAll('[data-maxsize]').forEach(function (b) {
     b.addEventListener('click', function () {
       maxSize = parseInt(b.dataset.maxsize, 10);
+      msCustom.value = '';
       document.querySelectorAll('[data-maxsize]').forEach(function (x) { x.classList.remove('on'); });
       b.classList.add('on'); saveState();
       if (maxSize > 0) showToast('Max size ' + b.textContent + ' — quality auto-adjusted on export');
     });
+  });
+  msCustom.addEventListener('input', function () {
+    var kb = parseInt(msCustom.value, 10);
+    document.querySelectorAll('[data-maxsize]').forEach(function (x) { x.classList.remove('on'); });
+    if (kb > 0) {
+      maxSize = Math.max(10, Math.min(20480, kb)) * 1024;
+    } else {
+      maxSize = 0;
+      document.querySelector('[data-maxsize="0"]').classList.add('on');
+    }
+    saveState();
+  });
+  msCustom.addEventListener('change', function () {
+    var kb = parseInt(msCustom.value, 10);
+    if (kb > 0) {
+      var clamped = Math.max(10, Math.min(20480, kb));
+      if (clamped !== kb) msCustom.value = clamped;
+      showToast('Max size ' + clamped + ' KB — quality & dimensions auto-adjusted');
+    }
   });
 
   document.getElementById('pmt-combined').addEventListener('click', function () {
@@ -1050,7 +1289,10 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   });
   document.getElementById('img-undo').addEventListener('click', function () {
     if (sel === null || !imgs[sel].undoStack || !imgs[sel].undoStack.length) return;
-    imgs[sel].dataUrl = imgs[sel].undoStack.pop();
+    var undoState = imgs[sel].undoStack.pop();
+    imgs[sel].dataUrl = undoState.dataUrl;
+    imgs[sel].cut = undoState.cut;
+    imgs[sel].cutoutDataUrl = undoState.cutoutDataUrl;
     var tmpImg = new Image();
     tmpImg.onload = function () {
       imgs[sel].w = tmpImg.width; imgs[sel].h = tmpImg.height;
@@ -1070,6 +1312,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       imgs[sel].w = tmpImg.width; imgs[sel].h = tmpImg.height;
       imgs[sel].size = calcSize(orig);
       imgs[sel].undoStack = [];
+      imgs[sel].cut = null; imgs[sel].cutoutDataUrl = null;
       imgs[sel].enhance = { br:0, co:0, sa:0, sh:0 };
       eBr.value = eCo.value = eSa.value = eSh.value = 0;
       onEnhanceChange(); render(); saveState(); syncTotalSize(); selectImg(sel);
@@ -1121,12 +1364,15 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
   function drawStack(loadedImgs, done) {
     var dim = getExportDim();
+    // transparent bg only survives in PNG; fall back to white for JPEG
+    var effBg = bg === 'transparent' ? (getMime() === 'image/png' ? null : '#ffffff') : bg;
     if (stackDir === 'h') {
       var exportH = dim;
       var widths = loadedImgs.map(function (im) { return im ? Math.round(exportH * im.naturalWidth / im.naturalHeight) : Math.round(exportH * 0.75); });
       var totalW = widths.reduce(function (s, w) { return s + w; }, 0) + gap * Math.max(0, loadedImgs.length - 1);
       expCanvas.width = totalW; expCanvas.height = exportH;
-      var ctx = expCanvas.getContext('2d'); ctx.fillStyle = bg; ctx.fillRect(0, 0, totalW, exportH);
+      var ctx = expCanvas.getContext('2d');
+      if (effBg) { ctx.fillStyle = effBg; ctx.fillRect(0, 0, totalW, exportH); }
       var x = 0;
       loadedImgs.forEach(function (im, idx) { var w = widths[idx]; if (im) drawWithEnhance(ctx, im, imgs[idx], x, 0, w, exportH); x += w + gap; });
     } else {
@@ -1134,7 +1380,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       var heights = loadedImgs.map(function (im) { return im ? Math.round(exportW * im.naturalHeight / im.naturalWidth) : Math.round(exportW * 0.75); });
       var totalH = heights.reduce(function (s, h) { return s + h; }, 0) + gap * Math.max(0, loadedImgs.length - 1);
       expCanvas.width = exportW; expCanvas.height = totalH;
-      var ctx = expCanvas.getContext('2d'); ctx.fillStyle = bg; ctx.fillRect(0, 0, exportW, totalH);
+      var ctx = expCanvas.getContext('2d');
+      if (effBg) { ctx.fillStyle = effBg; ctx.fillRect(0, 0, exportW, totalH); }
       var y = 0;
       loadedImgs.forEach(function (im, idx) { var h = heights[idx]; if (im) drawWithEnhance(ctx, im, imgs[idx], 0, y, exportW, h); y += h + gap; });
     }
@@ -1146,25 +1393,41 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   function getQ()    { return exportFmt === 'png' ? undefined : (compress ? 0.75 : 0.93); }
   function syncCompressRow() {
     var isPng = exportFmt === 'png';
-    var compressRow = document.getElementById('compress-row');
-    var maxsizeRow  = document.getElementById('maxsize-row');
-    compressRow.style.opacity = isPng ? '0.35' : '1';
-    compressRow.style.pointerEvents = isPng ? 'none' : '';
-    maxsizeRow.style.opacity = isPng ? '0.35' : '1';
-    maxsizeRow.style.pointerEvents = isPng ? 'none' : '';
+    [document.getElementById('compress-row'),
+     document.getElementById('maxsize-row'),
+     document.getElementById('maxsize-custom-row')].forEach(function (row) {
+      row.style.opacity = isPng ? '0.35' : '1';
+      row.style.pointerEvents = isPng ? 'none' : '';
+    });
   }
 
-  function blobUnderSize(mime, q, targetBytes, cb) {
+  function downscaleExpCanvas(factor) {
+    var tmp = document.createElement('canvas');
+    tmp.width = Math.max(1, Math.round(expCanvas.width * factor));
+    tmp.height = Math.max(1, Math.round(expCanvas.height * factor));
+    tmp.getContext('2d').drawImage(expCanvas, 0, 0, tmp.width, tmp.height);
+    expCanvas.width = tmp.width; expCanvas.height = tmp.height;
+    expCanvas.getContext('2d').drawImage(tmp, 0, 0);
+  }
+
+  function blobUnderSize(mime, q, targetBytes, cb, pass) {
+    pass = pass || 0;
     expCanvas.toBlob(function (blob) {
       if (blob.size <= targetBytes) { cb(blob); return; }
-      var lo = 0.60, hi = q, bestBlob = null, iters = 0;
+      var lo = 0.40, hi = q, bestBlob = null, iters = 0;
       function step(qv) {
         expCanvas.toBlob(function (b) {
           iters++;
           if (b.size <= targetBytes) { bestBlob = b; lo = qv; } else { hi = qv; }
-          if (iters >= 8 || (hi - lo) < 0.02) {
-            if (bestBlob) { cb(bestBlob); } else {
-              showToast('Can\'t reach target — saved at smallest quality');
+          if (iters >= 7 || (hi - lo) < 0.02) {
+            if (bestBlob) { cb(bestBlob); return; }
+            // quality floor hit — shrink dimensions and try again
+            if (pass < 5 && Math.min(expCanvas.width, expCanvas.height) > 150) {
+              var f = Math.max(0.5, Math.min(0.9, Math.sqrt(targetBytes / b.size)));
+              downscaleExpCanvas(f);
+              blobUnderSize(mime, q, targetBytes, cb, pass + 1);
+            } else {
+              showToast('Can\'t reach target — saved smallest possible');
               cb(b);
             }
           } else { step((lo + hi) / 2); }
@@ -1233,7 +1496,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       }
       var c = document.createElement('canvas'); c.width = cw; c.height = ch;
       var ctx = c.getContext('2d');
-      ctx.fillStyle = bg; ctx.fillRect(0, 0, cw, ch);
+      ctx.fillStyle = bg === 'transparent' ? '#ffffff' : bg; ctx.fillRect(0, 0, cw, ch);
       drawWithEnhance(ctx, im, imgs[idx], 0, 0, cw, ch);
       return { url: c.toDataURL(getMime(), getQ()), w: cw, h: ch };
     }).filter(Boolean);
@@ -1351,25 +1614,38 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   document.getElementById('crop-cancel-btn').addEventListener('click', closeCrop);
   cropModal.addEventListener('click', function (e) { if (e.target === cropModal) closeCrop(); });
 
+  function cropUrl(url, px, py, pw, ph, alpha, cb) {
+    var im = new Image();
+    im.onload = function () {
+      var c = document.createElement('canvas'); c.width = pw; c.height = ph;
+      c.getContext('2d').drawImage(im, px, py, pw, ph, 0, 0, pw, ph);
+      cb(alpha ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.96));
+    };
+    im.src = url;
+  }
+
   document.getElementById('crop-apply-btn').addEventListener('click', function () {
     var sx = cropImgEl.naturalWidth / cropImgW, sy = cropImgEl.naturalHeight / cropImgH;
     var px = Math.round(cropX * sx), py = Math.round(cropY * sy);
     var pw = Math.round(cropCW * sx), ph = Math.round(cropCH * sy);
-    var c = document.createElement('canvas'); c.width = pw; c.height = ph;
-    var ctx = c.getContext('2d');
-    var im = new Image();
-    im.onload = function () {
-      pushUndo(cropIdx);
-      ctx.drawImage(im, px, py, pw, ph, 0, 0, pw, ph);
-      var newUrl = c.toDataURL('image/jpeg', 0.96);
-      imgs[cropIdx].dataUrl = newUrl;
-      imgs[cropIdx].w = pw; imgs[cropIdx].h = ph;
-      imgs[cropIdx].size = calcSize(newUrl);
-      render(); saveState(); syncTotalSize();
-      if (sel === cropIdx) selectImg(cropIdx);
-      closeCrop(); showToast('Image cropped');
-    };
-    im.src = imgs[cropIdx].dataUrl;
+    var im = imgs[cropIdx];
+    pushUndo(cropIdx);
+    cropUrl(im.dataUrl, px, py, pw, ph, isTransparentCut(im), function (newUrl) {
+      im.dataUrl = newUrl;
+      im.w = pw; im.h = ph;
+      im.size = calcSize(newUrl);
+      function finish() {
+        render(); saveState(); syncTotalSize();
+        if (sel === cropIdx) selectImg(cropIdx);
+        closeCrop(); showToast('Image cropped');
+      }
+      if (im.cut && im.cutoutDataUrl) {
+        cropUrl(im.cutoutDataUrl, px, py, pw, ph, true, function (u2) {
+          im.cutoutDataUrl = u2;
+          cropUrl(im.cut.src, px, py, pw, ph, false, function (u3) { im.cut.src = u3; finish(); });
+        });
+      } else finish();
+    });
   });
 
   document.addEventListener('keydown', function (e) {
@@ -1383,6 +1659,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   });
 
   // ── Service worker ──
+  console.log('picstack build v4');
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(function () {});
   }

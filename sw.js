@@ -1,4 +1,4 @@
-var CACHE = 'picstack-v1';
+var CACHE = 'picstack-v4';
 var FILES = ['./', './index.html', './manifest.json', './icon.svg', './sw.js'];
 
 self.addEventListener('install', function (e) {
