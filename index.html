@@ -254,6 +254,15 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 .cell.filled:active { cursor: grabbing; }
 .cell.filled img { display: block; width: 100%; height: auto; pointer-events: none; user-select: none; transform-origin: 50% 50%; }
 .cell-vig { position: absolute; inset: 0; pointer-events: none; display: none; }
+.cell.filled .txt { display: block; width: 100%; box-sizing: border-box; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.3;
+  pointer-events: none; user-select: none; min-height: 1.3em; }
+#stack.h .cell.text .txt { height: 100%; width: auto; aspect-ratio: 4 / 1; overflow: hidden; }
+.cell.text.editing .txt { pointer-events: auto; user-select: text; outline: 2px dashed var(--accent); outline-offset: -2px; cursor: text; }
+.cell.text.editing { cursor: text; }
+.layer-thumb.txt-thumb { display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: var(--text-muted); }
+#txt-controls textarea { width: 100%; box-sizing: border-box; min-height: 64px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 3px;
+  color: var(--text); font-family: inherit; font-size: 12px; padding: 8px; resize: vertical; margin-bottom: 8px; }
+#txt-controls select { width: 100%; background: var(--surface-2); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 12px; padding: 6px 8px; border-radius: 3px; margin-bottom: 8px; }
 .cell-border { position: absolute; inset: 0; pointer-events: none; display: none; }
 .preset-row { display: flex; gap: 4px; margin: 4px 0 8px; }
 .preset-row select { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 12px; padding: 6px 8px; border-radius: 3px; }
@@ -400,6 +409,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       <h2 class="section-label" id="lbl-images">Images</h2>
       <button class="add-btn" id="add-btn"><span aria-hidden="true">+</span> Add images</button>
       <button class="add-btn" id="camera-btn" style="margin-top:6px;display:none"><span aria-hidden="true">📷</span> Take photo</button>
+      <button class="add-btn" id="add-text-btn" style="margin-top:6px"><span aria-hidden="true">T</span> Add text</button>
       <div class="img-count" id="img-count" aria-live="polite">0 images</div>
       <div class="img-total-size" id="img-total-size" aria-live="polite"></div>
       <div id="layers" role="listbox" aria-label="Layers" aria-multiselectable="true"></div>
@@ -456,6 +466,50 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     <div class="section" id="img-section" role="group" aria-labelledby="lbl-selected">
       <h2 class="section-label" id="lbl-selected">Selected image</h2>
       <div class="img-placeholder" id="img-placeholder">Click an image to adjust brightness, contrast &amp; sharpness</div>
+      <div id="txt-controls" style="display:none">
+        <div class="img-name" id="txt-panel-name">Text</div>
+        <textarea id="tx-text" aria-label="Text" placeholder="Type your caption…"></textarea>
+        <select id="tx-font" aria-label="Font">
+          <option value="Inter, system-ui, sans-serif">Sans (Inter)</option>
+          <option value="Georgia, 'Times New Roman', serif">Serif (Georgia)</option>
+          <option value="'Courier New', Courier, monospace">Mono (Courier)</option>
+          <option value="Impact, 'Arial Black', sans-serif">Display (Impact)</option>
+          <option value="'Trebuchet MS', Helvetica, sans-serif">Trebuchet</option>
+          <option value="'Brush Script MT', 'Comic Sans MS', cursive">Script</option>
+        </select>
+        <div class="enh-row">
+          <div class="enh-header"><span class="enh-label">Size</span><span class="enh-val" id="tx-size-val">32</span></div>
+          <input type="range" class="sl enh-sl" id="tx-size" min="12" max="160" value="32" aria-label="Text size">
+        </div>
+        <div class="ctrl-row" style="margin-bottom:10px">
+          <span class="ctrl-label">Style</span>
+          <div class="xopt-btns">
+            <button class="xopt" id="tx-bold" aria-pressed="false" title="Bold"><b>B</b></button>
+            <button class="xopt" id="tx-italic" aria-pressed="false" title="Italic"><i>I</i></button>
+          </div>
+        </div>
+        <div class="ctrl-row" style="margin-bottom:10px" role="group" aria-label="Alignment">
+          <span class="ctrl-label">Align</span>
+          <div class="xopt-btns">
+            <button class="xopt" data-talign="left" aria-pressed="false" title="Align left">⇤</button>
+            <button class="xopt on" data-talign="center" aria-pressed="true" title="Centre">☰</button>
+            <button class="xopt" data-talign="right" aria-pressed="false" title="Align right">⇥</button>
+          </div>
+        </div>
+        <div class="ctrl-row" style="margin-bottom:10px">
+          <span class="ctrl-label">Colour</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label title="Text colour"><input type="color" class="custom-color" id="tx-color" value="#111111" aria-label="Text colour"></label>
+            <label title="Background colour"><input type="color" class="custom-color" id="tx-bg" value="#ffffff" aria-label="Background colour"></label>
+            <button class="xopt" id="tx-bg-none" aria-pressed="true" title="No background">No bg</button>
+          </div>
+        </div>
+        <div class="img-action-btns">
+          <button class="img-action-btn" id="tx-dup" aria-label="Duplicate text">⧉ Dup</button>
+          <button class="img-action-btn" id="tx-rm" aria-label="Remove text">✕ Remove</button>
+        </div>
+        <div class="img-placeholder">Double-click the text on the canvas to edit in place. Image adjustments (opacity, corners, border, shadow) apply from the image panel when selected with images.</div>
+      </div>
       <div id="img-controls" style="display:none">
         <div class="img-name" id="img-panel-name"></div>
         <div class="img-meta" id="img-meta"></div>
@@ -781,6 +835,40 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     return Object.keys(d).every(function (k) { return k === 'lv' ? !e.lv : e[k] === d[k]; });
   }
   function uid() { return Math.random().toString(36).slice(2); }
+  function isText(im) { return !!im && im.type === 'text'; }
+  function defaultTx() { return { text: 'Your caption', font: 'Inter, system-ui, sans-serif', size: 32, color: '#111111', bg: 'transparent', align: 'center', bold: false, italic: false }; }
+  function newTextRec() { return { id: uid(), type: 'text', name: 'Text', tx: defaultTx(), w: 400, h: 100, size: 0, enhance: defaultEnhance(), sc: 1, ox: 0 }; }
+  function txFont(tx, k) { return (tx.italic ? 'italic ' : '') + (tx.bold ? '700 ' : '400 ') + (tx.size * (k || 1)) + 'px ' + tx.font; }
+  // wrap text for canvas: returns lines and total box height (padding = half the font size)
+  function measureTx(ctx, tx, w, k) {
+    ctx.font = txFont(tx, k);
+    var pad = tx.size * 0.5 * k, maxW = Math.max(10, w - pad * 2), lines = [];
+    tx.text.split('\n').forEach(function (para) {
+      var words = para.split(/(\s+)/), line = '';
+      words.forEach(function (word) {
+        var test = line + word;
+        if (ctx.measureText(test).width > maxW && line.trim()) { lines.push(line.replace(/\s+$/, '')); line = word.replace(/^\s+/, ''); }
+        else line = test;
+      });
+      lines.push(line.replace(/\s+$/, ''));
+    });
+    var lineH = tx.size * 1.3 * k;
+    return { lines: lines, lineH: lineH, pad: pad, height: Math.round(lines.length * lineH + pad * 2) };
+  }
+  function renderTxCanvas(tx, w, h, k) {
+    var c = document.createElement('canvas'); c.width = w; c.height = h; var ctx = c.getContext('2d');
+    if (tx.bg && tx.bg !== 'transparent') { ctx.fillStyle = tx.bg; ctx.fillRect(0, 0, w, h); }
+    var m = measureTx(ctx, tx, w, k);
+    ctx.fillStyle = tx.color; ctx.textBaseline = 'middle'; ctx.textAlign = tx.align;
+    var x = tx.align === 'left' ? m.pad : tx.align === 'right' ? w - m.pad : w / 2;
+    m.lines.forEach(function (ln, q) { ctx.fillText(ln, x, m.pad + m.lineH * (q + 0.5)); });
+    return c;
+  }
+  function applyTxStyle(el, tx) {
+    el.style.font = txFont(tx, 1); el.style.lineHeight = '1.3'; el.style.color = tx.color; el.style.textAlign = tx.align;
+    el.style.padding = (tx.size * 0.5) + 'px'; el.style.background = tx.bg === 'transparent' ? 'transparent' : tx.bg;
+    if (!el.isContentEditable) el.textContent = tx.text;
+  }
   function fmtV(v) { return (v > 0 ? '+' : '') + v; }
   function calcSize(url) { return Math.round((url.length - url.indexOf(',') - 1) * 3 / 4); }
   function fmtSize(b) { return b < 1048576 ? Math.round(b / 1024) + ' KB' : (b / 1048576).toFixed(1) + ' MB'; }
@@ -848,7 +936,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   function saveImages() {
     var payload = imgs.map(function (im) {
       return { id: im.id, dataUrl: im.dataUrl, name: im.name, w: im.w, h: im.h, size: im.size, enhance: im.enhance,
-               cut: im.cut || null, cutoutDataUrl: im.cutoutDataUrl || null, sc: im.sc, ox: im.ox, hid: !!im.hid };
+               cut: im.cut || null, cutoutDataUrl: im.cutoutDataUrl || null, sc: im.sc, ox: im.ox, hid: !!im.hid, type: im.type, tx: im.tx || null };
     });
     dbPut('imgs', payload);
     saveDot.className = 'save-dot saved';
@@ -862,6 +950,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     var c = Object.assign({}, im);
     c.enhance = JSON.parse(JSON.stringify(im.enhance || defaultEnhance()));
     c.cut = im.cut ? JSON.parse(JSON.stringify(im.cut)) : null;
+    if (im.tx) c.tx = JSON.parse(JSON.stringify(im.tx));
     delete c.undoStack; return c;
   }
   function snapState(label) { return { label: label || '', imgs: imgs.map(cloneRec), sel: sel, selIds: selIds.slice() }; }
@@ -927,6 +1016,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       if (stored && stored.length) {
         stored.forEach(function (im) {
           if (!im.size && im.dataUrl) im.size = calcSize(im.dataUrl);
+          if (im.type === 'text') im.tx = Object.assign(defaultTx(), im.tx || {});
           im.enhance = normEnhance(im.enhance);
           im.origDataUrl = im.dataUrl;
           im.undoStack = [];
@@ -1162,7 +1252,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     img.src = im.dataUrl;
   }
   function setAuto(mode) {
-    var t = selIdx(); if (!t.length) return;
+    var t = selIdx().filter(function (k) { return !isText(imgs[k]); }); if (!t.length) return;
     if (mode === 'off') { t.forEach(function (k) { imgs[k].enhance.lv = null; imgs[k].enhance.auto = 'off'; }); refreshPreviews(t); commit('Auto levels off'); return; }
     var n = t.length;
     t.forEach(function (k) { computeLevels(imgs[k], mode, function (lv) { imgs[k].enhance.lv = lv; imgs[k].enhance.auto = lv ? mode : 'off'; if (--n === 0) { refreshPreviews(t); commit(mode === 'color' ? 'Auto colour' : 'Auto contrast'); showToast(mode === 'color' ? 'Auto colour applied' : 'Auto contrast applied'); } }); });
@@ -1311,10 +1401,13 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     selIds = imgs.map(function (im) { return im.id; }); if (sel === null) sel = 0;
     render(); showPanel(sel); announce('All ' + imgs.length + ' images selected');
   }
-  function hidePanel() { imgPlaceholder.style.display = 'block'; imgControls.style.display = 'none'; }
+  var txtControls = document.getElementById('txt-controls');
+  function hidePanel() { imgPlaceholder.style.display = 'block'; imgControls.style.display = 'none'; txtControls.style.display = 'none'; }
 
   function showPanel(i) {
     var e = imgs[i].enhance;
+    if (isText(imgs[i]) && selIds.length === 1) { imgPlaceholder.style.display = 'none'; imgControls.style.display = 'none'; txtControls.style.display = 'block'; syncTextPanel(imgs[i].tx); syncHistBtns(); return; }
+    txtControls.style.display = 'none';
     imgPlaceholder.style.display = 'none'; imgControls.style.display = 'block';
     var name = imgs[i].name || ('Image ' + (i + 1));
     imgPanelName.textContent = selIds.length > 1 ? selIds.length + ' images selected' : (name.length > 24 ? name.slice(0,22) + '…' : name);
@@ -1368,8 +1461,10 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       var row = document.createElement('div');
       row.className = 'layer' + (isSel(i) ? ' selected' : '') + (im.hid ? ' hid' : '');
       row.setAttribute('role', 'option'); row.setAttribute('aria-selected', isSel(i) ? 'true' : 'false'); row.tabIndex = 0; row.dataset.idx = i;
-      var th = document.createElement('img'); th.className = 'layer-thumb'; th.src = im.dataUrl; th.alt = ''; th.draggable = false;
-      var nm = document.createElement('span'); nm.className = 'layer-name'; nm.textContent = String(i + 1).padStart(2, '0') + '  ' + (im.name || 'Image ' + (i + 1));
+      var th;
+      if (isText(im)) { th = document.createElement('div'); th.className = 'layer-thumb txt-thumb'; th.textContent = 'T'; }
+      else { th = document.createElement('img'); th.className = 'layer-thumb'; th.src = im.dataUrl; th.alt = ''; th.draggable = false; }
+      var nm = document.createElement('span'); nm.className = 'layer-name'; nm.textContent = String(i + 1).padStart(2, '0') + '  ' + (isText(im) ? (im.tx.text.split('\n')[0].slice(0, 28) || 'Text') : (im.name || 'Image ' + (i + 1)));
       var eye = document.createElement('button'); eye.className = 'layer-eye'; eye.textContent = im.hid ? '◌' : '◉';
       eye.title = im.hid ? 'Show' : 'Hide'; eye.setAttribute('aria-label', (im.hid ? 'Show ' : 'Hide ') + (im.name || 'image ' + (i + 1)));
       eye.addEventListener('click', function (e) { e.stopPropagation(); toggleHidden(targetsFor(i).indexOf(i) !== -1 && isSel(i) ? selIdx() : [i], !im.hid); });
@@ -1421,9 +1516,15 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     var cell = document.createElement('div');
     cell.className = 'cell filled' + (isSel(i) ? ' selected' : '') + (sel === i ? ' primary' : '') + (imgs[i].hid ? ' hidden' : '');
     cell.dataset.idx = i; cell.setAttribute('role', 'listitem');
-    var imgEl = document.createElement('img');
-    imgEl.src = imgs[i].dataUrl; imgEl.alt = imgs[i].name || ('Image ' + (i + 1));
-    if (isTransparentCut(imgs[i])) imgEl.classList.add('alpha-check');
+    var imgEl;
+    if (isText(imgs[i])) {
+      cell.classList.add('text');
+      imgEl = document.createElement('div'); imgEl.className = 'txt'; applyTxStyle(imgEl, imgs[i].tx);
+    } else {
+      imgEl = document.createElement('img');
+      imgEl.src = imgs[i].dataUrl; imgEl.alt = imgs[i].name || ('Image ' + (i + 1));
+      if (isTransparentCut(imgs[i])) imgEl.classList.add('alpha-check');
+    }
     cell.appendChild(imgEl);
     var vigEl = document.createElement('div'); vigEl.className = 'cell-vig'; vigEl.setAttribute('aria-hidden', 'true'); cell.appendChild(vigEl);
     var bdEl = document.createElement('div'); bdEl.className = 'cell-border'; bdEl.setAttribute('aria-hidden', 'true'); cell.appendChild(bdEl);
@@ -1437,7 +1538,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       if (!isSel(i)) selectImg(i); else if (sel !== i) { sel = i; render(); showPanel(i); }
       openCtxMenu(e.clientX, e.clientY, i);
     });
-    cell.addEventListener('dblclick', function (e) { if (e.target.closest('.cell-rm')) return; targetsFor(i).forEach(function (k) { setSize(k, 1, 0); }); commit('Fit to width'); if (!isSel(i)) selectImg(i); showToast('Fit to width'); });
+
     var tb = document.createElement('div'); tb.className = 'cell-toolbar';
     var left = document.createElement('div'); left.style.cssText = 'display:flex;align-items:center;gap:6px';
     var num = document.createElement('span'); num.className = 'cell-num'; num.setAttribute('aria-hidden','true');
@@ -1451,12 +1552,23 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     cell.setAttribute('aria-label', 'Image ' + (i + 1) + ': ' + (imgs[i].name || 'untitled') + '. Press Enter to select.');
     cell.setAttribute('title', 'Drag to move · click to select');
     cell.addEventListener('keydown', function (e) {
+      if (e.target.isContentEditable) return;
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSelect(i, e); return; }
     });
     attachPointerDrag(cell, i);
     addDropListeners(cell, i, true); return cell;
   }
 
+  // double-click on a cell: edit text in place, or fit an image to full width
+  var lastClickIdx = null, lastClickAt = 0;
+  function cellClick(i, e) {
+    var now = Date.now(), dbl = lastClickIdx === i && now - lastClickAt < 380 && !(e && (e.shiftKey || e.metaKey || e.ctrlKey));
+    lastClickIdx = i; lastClickAt = now;
+    if (!dbl) { toggleSelect(i, e); return; }
+    lastClickIdx = null;
+    if (isText(imgs[i])) { var c = stackEl.querySelector('.cell[data-idx="' + i + '"]'); if (c) startTextEdit(c, i); return; }
+    targetsFor(i).forEach(function (k) { setSize(k, 1, 0); }); if (!isSel(i)) selectImg(i); commit('Fit to width'); showToast('Fit to width');
+  }
   function toggleSelect(i, e) {
     if (e && e.shiftKey) selectImg(i, 'range');
     else if (e && (e.metaKey || e.ctrlKey)) selectImg(i, 'toggle');
@@ -1597,8 +1709,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     announce('Image moved to position ' + (to + 1));
   }
   // batch versions of the baked edits: one history entry for the whole selection
-  function rotateAll(t, deg) { var n = t.length; t.forEach(function (k) { rotateImage(k, deg, function () { if (--n === 0) { render(); syncTotalSize(); commit(t.length > 1 ? 'Rotate ' + t.length + ' images' : 'Rotate'); if (sel !== null) showPanel(sel); } }); }); }
-  function flipAll(t, axis) { var n = t.length; t.forEach(function (k) { flipImage(k, axis, function () { if (--n === 0) { render(); syncTotalSize(); commit(t.length > 1 ? 'Flip ' + t.length + ' images' : 'Flip'); if (sel !== null) showPanel(sel); showToast(axis === 'h' ? 'Flipped horizontally' : 'Flipped vertically'); } }); }); }
+  function rotateAll(t, deg) { t = t.filter(function (k) { return !isText(imgs[k]); }); if (!t.length) return; var n = t.length; t.forEach(function (k) { rotateImage(k, deg, function () { if (--n === 0) { render(); syncTotalSize(); commit(t.length > 1 ? 'Rotate ' + t.length + ' images' : 'Rotate'); if (sel !== null) showPanel(sel); } }); }); }
+  function flipAll(t, axis) { t = t.filter(function (k) { return !isText(imgs[k]); }); if (!t.length) return; var n = t.length; t.forEach(function (k) { flipImage(k, axis, function () { if (--n === 0) { render(); syncTotalSize(); commit(t.length > 1 ? 'Flip ' + t.length + ' images' : 'Flip'); if (sel !== null) showPanel(sel); showToast(axis === 'h' ? 'Flipped horizontally' : 'Flipped vertically'); } }); }); }
 
   // ── Direct drag: grab an image anywhere, it follows the pointer, and slides into a new slot as you pass others ──
   function attachPointerDrag(cell, i) {
@@ -1683,7 +1795,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       unbind();
       var wasMoved = moved;
       finish(true);
-      if (!wasMoved) toggleSelect(i, e);
+      if (!wasMoved) cellClick(i, e);
     }
     function onCancel(e) { if (e.pointerId !== pid) return; unbind(); finish(false); render(); }
     function unbind() {
@@ -1691,7 +1803,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     }
     cell.addEventListener('pointerdown', function (e) {
       if (pid !== null || (e.button !== undefined && e.button !== 0)) return;
-      if (e.target.closest('.cell-rm') || e.target.closest('.rs-h')) return;
+      if (e.target.closest('.cell-rm') || e.target.closest('.rs-h') || cell.classList.contains('editing')) return;
       pid = e.pointerId; sx = lastX = e.clientX; sy = lastY = e.clientY; moved = false; lifted = false; scrolling = false; downAt = Date.now();
       dup = !!e.altKey;
       window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp); window.addEventListener('pointercancel', onCancel);
@@ -2012,7 +2124,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     return { id: uid(), dataUrl: src.dataUrl, origDataUrl: src.origDataUrl || src.dataUrl,
       name: src.name ? src.name.replace(/(\.[^.]+)?$/, ' copy$1') : 'copy', w: src.w, h: src.h, size: src.size,
       enhance: JSON.parse(JSON.stringify(src.enhance)), cut: src.cut ? JSON.parse(JSON.stringify(src.cut)) : null,
-      cutoutDataUrl: src.cutoutDataUrl || null, undoStack: [], sc: src.sc, ox: src.ox };
+      cutoutDataUrl: src.cutoutDataUrl || null, undoStack: [], sc: src.sc, ox: src.ox,
+      type: src.type, tx: src.tx ? JSON.parse(JSON.stringify(src.tx)) : undefined, hid: src.hid };
   }
   // copies are inserted right after each source; the copies become the new selection
   function duplicateImages(t) {
@@ -2081,6 +2194,68 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     for (var k = 0; k < items.length; k++) if (items[k].kind === 'file' && items[k].type.indexOf('image/') === 0) { var f = items[k].getAsFile(); if (f) files.push(f); }
     if (files.length) { e.preventDefault(); loadFiles(files); }
   });
+
+  // ── Text layers ──
+  var txText = document.getElementById('tx-text'), txFontSel = document.getElementById('tx-font'), txSize = document.getElementById('tx-size'), txSizeVal = document.getElementById('tx-size-val');
+  var txColor = document.getElementById('tx-color'), txBg = document.getElementById('tx-bg'), txBgNone = document.getElementById('tx-bg-none');
+  var txBold = document.getElementById('tx-bold'), txItalic = document.getElementById('tx-italic'), txAlignBtns = document.querySelectorAll('[data-talign]');
+  function syncTextPanel(tx) {
+    if (document.activeElement !== txText) txText.value = tx.text;
+    txFontSel.value = tx.font; txSize.value = tx.size; txSizeVal.textContent = tx.size; txColor.value = tx.color;
+    var noBg = !tx.bg || tx.bg === 'transparent'; txBgNone.classList.toggle('on', noBg); txBgNone.setAttribute('aria-pressed', noBg ? 'true' : 'false'); if (!noBg) txBg.value = tx.bg;
+    txBold.classList.toggle('on', !!tx.bold); txBold.setAttribute('aria-pressed', tx.bold ? 'true' : 'false');
+    txItalic.classList.toggle('on', !!tx.italic); txItalic.setAttribute('aria-pressed', tx.italic ? 'true' : 'false');
+    txAlignBtns.forEach(function (b) { var on = b.dataset.talign === tx.align; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+  }
+  function curText() { return sel !== null && isText(imgs[sel]) ? imgs[sel] : null; }
+  function updateText(mut, label, noCommit) {
+    var rec = curText(); if (!rec) return;
+    mut(rec.tx);
+    var el = stackEl.querySelector('.cell[data-idx="' + sel + '"] .txt'); if (el) applyTxStyle(el, rec.tx);
+    syncTextPanel(rec.tx); renderLayers();
+    if (noCommit) saveState(); else commit(label || 'Edit text');
+  }
+  txText.addEventListener('input', function () { updateText(function (tx) { tx.text = txText.value; }, 'Edit text', true); });
+  txText.addEventListener('change', function () { updateText(function (tx) { tx.text = txText.value; }, 'Edit text'); });
+  txFontSel.addEventListener('change', function () { updateText(function (tx) { tx.font = txFontSel.value; }, 'Text font'); });
+  txSize.addEventListener('input', function () { updateText(function (tx) { tx.size = parseInt(txSize.value, 10); }, 'Text size', true); });
+  txSize.addEventListener('change', function () { updateText(function (tx) { tx.size = parseInt(txSize.value, 10); }, 'Text size'); });
+  txColor.addEventListener('input', function () { updateText(function (tx) { tx.color = txColor.value; }, 'Text colour', true); });
+  txColor.addEventListener('change', function () { updateText(function (tx) { tx.color = txColor.value; }, 'Text colour'); });
+  txBg.addEventListener('input', function () { updateText(function (tx) { tx.bg = txBg.value; }, 'Text background', true); });
+  txBg.addEventListener('change', function () { updateText(function (tx) { tx.bg = txBg.value; }, 'Text background'); });
+  txBgNone.addEventListener('click', function () { updateText(function (tx) { tx.bg = (tx.bg === 'transparent') ? txBg.value : 'transparent'; }, 'Text background'); });
+  txBold.addEventListener('click', function () { updateText(function (tx) { tx.bold = !tx.bold; }, 'Bold'); });
+  txItalic.addEventListener('click', function () { updateText(function (tx) { tx.italic = !tx.italic; }, 'Italic'); });
+  txAlignBtns.forEach(function (b) { b.addEventListener('click', function () { updateText(function (tx) { tx.align = b.dataset.talign; }, 'Text align'); }); });
+  document.getElementById('tx-dup').addEventListener('click', function () { if (sel !== null) duplicateImages(selIdx()); });
+  document.getElementById('tx-rm').addEventListener('click', function () { if (sel !== null) removeImages(selIdx()); });
+
+  function addText() {
+    var rec = newTextRec(), at = sel !== null ? sel + 1 : imgs.length;
+    imgs.splice(at, 0, rec); selIds = [rec.id]; sel = at;
+    render(); syncCount(); syncButtons(); commit('Add text'); showPanel(sel);
+    txText.focus(); txText.select();
+  }
+  document.getElementById('add-text-btn').addEventListener('click', addText);
+
+  // in-place editing on the canvas
+  function startTextEdit(cell, i) {
+    var el = cell.querySelector('.txt'); if (!el || cell.classList.contains('editing')) return;
+    if (!isSel(i)) selectImg(i);
+    cell = stackEl.querySelector('.cell[data-idx="' + i + '"]'); el = cell.querySelector('.txt');
+    cell.classList.add('editing'); el.contentEditable = 'true'; el.focus();
+    var range = document.createRange(); range.selectNodeContents(el); var s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(range);
+    function done() {
+      el.removeEventListener('blur', done); el.removeEventListener('keydown', onKey);
+      var txt = el.innerText.replace(/\u00a0/g, ' ').replace(/\n$/, '');
+      el.contentEditable = 'false'; cell.classList.remove('editing');
+      if (imgs[i] && isText(imgs[i]) && imgs[i].tx.text !== txt) { imgs[i].tx.text = txt; applyTxStyle(el, imgs[i].tx); renderLayers(); commit('Edit text'); if (sel === i) syncTextPanel(imgs[i].tx); }
+      else applyTxStyle(el, imgs[i].tx);
+    }
+    function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); el.blur(); } e.stopPropagation(); }
+    el.addEventListener('blur', done); el.addEventListener('keydown', onKey);
+  }
 
   // ── Global shortcuts ──
   function inField(t) { return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable); }
@@ -2173,6 +2348,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     var loaded = new Array(imgs.length), pending = imgs.length;
     imgs.forEach(function (imgData, idx) {
       if (imgData.hid) { loaded[idx] = null; pending--; if (!pending) drawStack(loaded, done); return; }
+      if (isText(imgData)) { loaded[idx] = 'text'; pending--; if (!pending) drawStack(loaded, done); return; }
       var im = new Image();
       im.onload  = function () { loaded[idx] = im;   pending--; if (!pending) drawStack(loaded, done); };
       im.onerror = function () { loaded[idx] = null; pending--; if (!pending) drawStack(loaded, done); };
@@ -2201,25 +2377,28 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     var vis = []; loadedImgs.forEach(function (im, idx) { if (im && !imgs[idx].hid) vis.push(idx); });
     if (!vis.length) { expCanvas.width = 1; expCanvas.height = 1; done(expCanvas); return; }
     var ctx;
+    var mctx = document.createElement('canvas').getContext('2d'), k = exportRes;
+    // text items are rendered to a canvas at their laid-out size, then treated like images
+    function src(idx, w, h) { return isText(imgs[idx]) ? renderTxCanvas(imgs[idx].tx, w, h, k) : loadedImgs[idx]; }
     if (stackDir === 'h') {
       var exportH = dim, gh = gap * exportRes;
       var hs = vis.map(function (idx) { return fracPx(sizeOf(imgs[idx]).sc, exportH, gh, true); });
-      var widths = vis.map(function (idx, q) { var im = loadedImgs[idx]; return Math.round(hs[q] * im.naturalWidth / im.naturalHeight); });
+      var widths = vis.map(function (idx, q) { var im = loadedImgs[idx]; return isText(imgs[idx]) ? hs[q] * 4 : Math.round(hs[q] * im.naturalWidth / im.naturalHeight); });
       var totalW = widths.reduce(function (s, w) { return s + w; }, 0) + gh * Math.max(0, vis.length - 1);
       expCanvas.width = totalW; expCanvas.height = exportH;
       ctx = expCanvas.getContext('2d');
       if (effBg) { ctx.fillStyle = effBg; ctx.fillRect(0, 0, totalW, exportH); }
       var x = 0;
-      vis.forEach(function (idx, q) { drawWithEnhance(ctx, loadedImgs[idx], imgs[idx], x, fracPx(sizeOf(imgs[idx]).ox, exportH, gh, false), widths[q], hs[q]); x += widths[q] + gh; });
+      vis.forEach(function (idx, q) { drawWithEnhance(ctx, src(idx, widths[q], hs[q]), imgs[idx], x, fracPx(sizeOf(imgs[idx]).ox, exportH, gh, false), widths[q], hs[q]); x += widths[q] + gh; });
     } else {
       var exportW = dim, g = gap * exportRes;
       var ws = vis.map(function (idx) { return fracPx(sizeOf(imgs[idx]).sc, exportW, g, true); });
-      var heights = vis.map(function (idx, q) { var im = loadedImgs[idx]; return Math.round(ws[q] * im.naturalHeight / im.naturalWidth); });
+      var heights = vis.map(function (idx, q) { var im = loadedImgs[idx]; return isText(imgs[idx]) ? measureTx(mctx, imgs[idx].tx, ws[q], k).height : Math.round(ws[q] * im.naturalHeight / im.naturalWidth); });
       var pos = flowLayout(exportW, g, vis.map(function (idx, q) { return { w: ws[q], h: heights[q], ox: fracPx(sizeOf(imgs[idx]).ox, exportW, g, false) }; }));
       expCanvas.width = exportW; expCanvas.height = pos.height;
       ctx = expCanvas.getContext('2d');
       if (effBg) { ctx.fillStyle = effBg; ctx.fillRect(0, 0, exportW, pos.height); }
-      vis.forEach(function (idx, q) { drawWithEnhance(ctx, loadedImgs[idx], imgs[idx], pos.items[q].x, pos.items[q].y, ws[q], heights[q]); });
+      vis.forEach(function (idx, q) { drawWithEnhance(ctx, src(idx, ws[q], heights[q]), imgs[idx], pos.items[q].x, pos.items[q].y, ws[q], heights[q]); });
     }
     done(expCanvas);
   }
@@ -2315,6 +2494,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     var loaded = new Array(imgs.length), pending = imgs.length;
     imgs.forEach(function (imgData, idx) {
       if (imgData.hid) { loaded[idx] = null; pending--; if (!pending) buildPdfPages(loaded, dim); return; }
+      if (isText(imgData)) { loaded[idx] = 'text'; pending--; if (!pending) buildPdfPages(loaded, dim); return; }
       var im = new Image();
       im.onload  = function () { loaded[idx] = im;   pending--; if (!pending) buildPdfPages(loaded, dim); };
       im.onerror = function () { loaded[idx] = null; pending--; if (!pending) buildPdfPages(loaded, dim); };
@@ -2325,17 +2505,17 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   function buildPdfPages(loadedImgs, dim) {
     var pageData = loadedImgs.map(function (im, idx) {
       if (!im) return null;
-      var cw, ch;
+      var cw, ch, tx = isText(imgs[idx]);
       var scl = sizeOf(imgs[idx]).sc, gp = gap * exportRes;
       if (stackDir === 'h') {
-        ch = fracPx(scl, dim, gp, true); cw = Math.round(ch * im.naturalWidth / im.naturalHeight);
+        ch = fracPx(scl, dim, gp, true); cw = tx ? ch * 4 : Math.round(ch * im.naturalWidth / im.naturalHeight);
       } else {
-        cw = fracPx(scl, dim, gp, true); ch = Math.round(cw * im.naturalHeight / im.naturalWidth);
+        cw = fracPx(scl, dim, gp, true); ch = tx ? measureTx(document.createElement('canvas').getContext('2d'), imgs[idx].tx, cw, exportRes).height : Math.round(cw * im.naturalHeight / im.naturalWidth);
       }
       var c = document.createElement('canvas'); c.width = cw; c.height = ch;
       var ctx = c.getContext('2d');
       ctx.fillStyle = bg === 'transparent' ? '#ffffff' : bg; ctx.fillRect(0, 0, cw, ch);
-      drawWithEnhance(ctx, im, imgs[idx], 0, 0, cw, ch);
+      drawWithEnhance(ctx, tx ? renderTxCanvas(imgs[idx].tx, cw, ch, exportRes) : im, imgs[idx], 0, 0, cw, ch);
       return { url: c.toDataURL(getMime(), getQ()), w: cw, h: ch };
     }).filter(Boolean);
 
