@@ -1759,6 +1759,32 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     });
   });
 
+  // ── Copy / paste: an in-app clipboard of image records, plus OS-clipboard images via the paste event ──
+  var clipboard = [];
+  function copySelection(cut) {
+    var t = selIdx(); if (!t.length) return;
+    clipboard = t.map(function (k) { return cloneRec(imgs[k]); });
+    if (cut) removeImages(t);
+    showToast((cut ? 'Cut ' : 'Copied ') + (t.length > 1 ? t.length + ' images' : 'image'));
+  }
+  function pasteClipboard() {
+    if (!clipboard.length) return;
+    var copies = clipboard.map(function (rec) { var cp = makeCopy(rec); cp.name = rec.name; return cp; });
+    var at = sel !== null ? sel + 1 : imgs.length;
+    imgs = imgs.slice(0, at).concat(copies, imgs.slice(at));
+    selIds = copies.map(function (cp) { return cp.id; }); sel = at;
+    render(); syncCount(); syncTotalSize(); syncButtons();
+    commit(copies.length > 1 ? 'Paste ' + copies.length + ' images' : 'Paste');
+    showPanel(sel); showToast(copies.length > 1 ? copies.length + ' images pasted' : 'Pasted');
+  }
+  document.addEventListener('paste', function (e) {
+    if (inField(e.target)) return;
+    var items = e.clipboardData && e.clipboardData.items; if (!items) return;
+    var files = [];
+    for (var k = 0; k < items.length; k++) if (items[k].kind === 'file' && items[k].type.indexOf('image/') === 0) { var f = items[k].getAsFile(); if (f) files.push(f); }
+    if (files.length) { e.preventDefault(); loadFiles(files); }
+  });
+
   // ── Global shortcuts ──
   function inField(t) { return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable); }
   document.addEventListener('keydown', function (e) {
@@ -1768,6 +1794,9 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     if (mod && k === 'y') { e.preventDefault(); redo(); return; }
     if (mod && k === 'a') { e.preventDefault(); selectAll(); return; }
     if (mod && !e.shiftKey && k === 'd') { e.preventDefault(); if (sel !== null) duplicateImages(selIdx()); return; }
+    if (mod && k === 'c') { if (sel !== null) { e.preventDefault(); copySelection(false); } return; }
+    if (mod && k === 'x') { if (sel !== null) { e.preventDefault(); copySelection(true); } return; }
+    if (mod && k === 'v') { if (clipboard.length) { e.preventDefault(); pasteClipboard(); } return; } // else let the paste event bring in OS images
     if ((e.key === 'Delete' || e.key === 'Backspace') && sel !== null) { e.preventDefault(); removeImages(selIdx()); return; }
     if (e.key === 'Escape' && sel !== null && !ctxMenu.classList.contains('open')) { deselect(); return; }
     // Arrows: move the selection one slot. Shift+Arrow: nudge its offset 1% across the stack (5% with Alt).
