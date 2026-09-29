@@ -238,6 +238,13 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 .cell.filled:active { cursor: grabbing; }
 .cell.filled img { display: block; width: 100%; height: auto; pointer-events: none; user-select: none; transform-origin: 50% 50%; }
 .cell-vig { position: absolute; inset: 0; pointer-events: none; display: none; }
+.cell-border { position: absolute; inset: 0; pointer-events: none; display: none; }
+.preset-row { display: flex; gap: 4px; margin: 4px 0 8px; }
+.preset-row select { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 12px; padding: 6px 8px; border-radius: 3px; }
+.preset-row button { min-width: 36px; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 3px; color: var(--text-muted); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.preset-row button:hover { border-color: var(--accent); color: var(--accent); }
+.tpl-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; }
+.tpl-btns .xopt { padding: 7px 4px; font-size: 11px; }
 #stack.h .cell.filled img { width: auto; height: 100%; }
 .cell.filled.drag-on { box-shadow: inset 0 0 0 2px var(--accent); }
 .cell.filled.dragging { opacity: 0.35; }
@@ -397,6 +404,17 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
           <span class="step-val" id="gap-val">8px</span>
         </div>
       </div>
+      <div class="ctrl-row" style="align-items:flex-start;margin-bottom:10px">
+        <span class="ctrl-label" style="padding-top:8px">Arrange</span>
+        <div class="tpl-btns" role="group" aria-label="Layout templates" style="flex:1;margin-left:12px">
+          <button class="xopt" data-tpl="1" title="One per row">1 col</button>
+          <button class="xopt" data-tpl="0.5" title="Two per row">2 col</button>
+          <button class="xopt" data-tpl="0.3333" title="Three per row">3 col</button>
+          <button class="xopt" data-tpl="0.25" title="Four per row">4 col</button>
+          <button class="xopt" data-tpl="1,0.5,0.5" title="One big, two small">Feature</button>
+          <button class="xopt" data-tpl="0.6667,0.3333,0.3333,0.6667" title="Alternating thirds">Mosaic</button>
+        </div>
+      </div>
       <div class="ctrl-row">
         <span class="ctrl-label" id="dim-label">Width</span>
         <div class="gap-track">
@@ -489,6 +507,17 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
           <div class="enh-header"><span class="enh-label">Corners</span><span class="enh-val" id="e-rc-val">0%</span></div>
           <input type="range" class="sl enh-sl" id="e-rc" min="0" max="50" value="0" aria-label="Rounded corners">
         </div>
+        <div class="enh-row">
+          <div class="enh-header"><span class="enh-label">Border</span><span class="enh-val" id="e-bw-val">0</span></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="range" class="sl enh-sl" id="e-bw" min="0" max="40" value="0" aria-label="Border width" style="flex:1">
+            <label title="Border colour"><input type="color" class="custom-color" id="e-bc" value="#ffffff" aria-label="Border colour"></label>
+          </div>
+        </div>
+        <div class="enh-row">
+          <div class="enh-header"><span class="enh-label">Shadow</span><span class="enh-val" id="e-sd-val">0</span></div>
+          <input type="range" class="sl enh-sl" id="e-sd" min="0" max="100" value="0" aria-label="Drop shadow">
+        </div>
         <div class="ctrl-row" style="margin-bottom:10px" role="group" aria-label="Effects">
           <span class="ctrl-label">Effect</span>
           <div class="xopt-btns">
@@ -513,6 +542,12 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
             <button class="swatch" style="background:#1A1A28" data-fill="#1A1A28" aria-label="Dark"></button>
             <label title="Custom fill"><input type="color" class="custom-color" id="custom-fill" value="#ffffff" aria-label="Custom new background color"></label>
           </div>
+        </div>
+        <div class="ctrl-label" style="margin-bottom:4px">Presets</div>
+        <div class="preset-row">
+          <select id="preset-select" aria-label="Apply a saved preset"><option value="">Apply preset…</option></select>
+          <button id="preset-save" title="Save the current adjustments as a preset" aria-label="Save preset">+</button>
+          <button id="preset-del" title="Delete the chosen preset" aria-label="Delete preset">✕</button>
         </div>
         <div class="img-action-btns">
           <button class="img-action-btn" id="img-dup" aria-label="Duplicate image" title="Duplicate this image (Cmd/Ctrl+D)">⧉ Dup</button>
@@ -709,6 +744,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   var eRc = document.getElementById('e-rc'), eRcVal = document.getElementById('e-rc-val');
   var eTp = document.getElementById('e-tp'), eTpVal = document.getElementById('e-tp-val');
   var eTn = document.getElementById('e-tn'), eTnVal = document.getElementById('e-tn-val');
+  var eBw = document.getElementById('e-bw'), eBwVal = document.getElementById('e-bw-val'), eBc = document.getElementById('e-bc');
+  var eSd = document.getElementById('e-sd'), eSdVal = document.getElementById('e-sd-val');
   var autoBtns = document.querySelectorAll('[data-auto]');
   var fxBtns = document.querySelectorAll('[data-fx]');
   var installBar  = document.getElementById('install-bar');
@@ -716,7 +753,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   var installDismiss = document.getElementById('install-dismiss');
 
   // ── Helpers ──
-  function defaultEnhance() { return { br:0, co:0, sa:0, sh:0, hu:0, bl:0, op:100, gs:false, sp:false, inv:false, rot:0, vg:0, rc:0, tp:0, tn:0, lv:null, auto:'off' }; }
+  function defaultEnhance() { return { br:0, co:0, sa:0, sh:0, hu:0, bl:0, op:100, gs:false, sp:false, inv:false, rot:0, vg:0, rc:0, tp:0, tn:0, lv:null, auto:'off', bw:0, bc:'#ffffff', sd:0 }; }
   function normEnhance(e) {
     var d = defaultEnhance(); e = e || {};
     Object.keys(d).forEach(function (k) { if (e[k] === undefined || e[k] === null) e[k] = d[k]; });
@@ -1134,7 +1171,12 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     var shortSide = Math.min(dispW, dispW * (im.h || 3) / (im.w || 4));
     var radius = e.rc ? Math.round(shortSide * e.rc / 100) + 'px' : '';
     var cell = imgEl.parentNode;
-    if (cell) { cell.style.borderRadius = radius; }
+    if (cell) {
+      cell.style.borderRadius = radius;
+      cell.style.filter = e.sd > 0 ? 'drop-shadow(0 ' + (e.sd * 0.15).toFixed(1) + 'px ' + (e.sd * 0.3).toFixed(1) + 'px rgba(0,0,0,' + (0.35 + e.sd / 100 * 0.4).toFixed(2) + '))' : '';
+      var bd = cell.querySelector('.cell-border');
+      if (bd) { if (e.bw > 0) { bd.style.display = 'block'; bd.style.borderRadius = radius; bd.style.boxShadow = 'inset 0 0 0 ' + e.bw + 'px ' + e.bc; } else bd.style.display = 'none'; }
+    }
     var vig = cell ? cell.querySelector('.cell-vig') : null;
     if (vig) {
       if (e.vg > 0) { var v = vigStops(e.vg); vig.style.display = 'block'; vig.style.borderRadius = radius;
@@ -1272,7 +1314,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     }
     e = imgs[i].enhance = normEnhance(e);
     eBr.value = e.br; eCo.value = e.co; eSa.value = e.sa; eSh.value = e.sh; eHu.value = e.hu; eBl.value = e.bl; eOp.value = e.op;
-    eRot.value = e.rot; eVg.value = e.vg; eRc.value = e.rc; eTp.value = e.tp; eTn.value = e.tn;
+    eRot.value = e.rot; eVg.value = e.vg; eRc.value = e.rc; eTp.value = e.tp; eTn.value = e.tn; eBw.value = e.bw; eBc.value = e.bc; eSd.value = e.sd;
     syncEnhanceLabels(e);
     var cut = imgs[i].cut;
     document.getElementById('bgfill-controls').style.display = cut ? 'block' : 'none';
@@ -1308,6 +1350,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     if (isTransparentCut(imgs[i])) imgEl.classList.add('alpha-check');
     cell.appendChild(imgEl);
     var vigEl = document.createElement('div'); vigEl.className = 'cell-vig'; vigEl.setAttribute('aria-hidden', 'true'); cell.appendChild(vigEl);
+    var bdEl = document.createElement('div'); bdEl.className = 'cell-border'; bdEl.setAttribute('aria-hidden', 'true'); cell.appendChild(bdEl);
     applyPreviewStyle(imgEl, imgs[i]);
     applySize(cell, imgs[i]);
     ['nw','ne','sw','se'].forEach(function (k) { var h = document.createElement('div'); h.className = 'rs-h ' + k; h.setAttribute('aria-hidden','true'); h.title = 'Drag to resize'; cell.appendChild(h); });
@@ -1640,6 +1683,44 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   document.getElementById('dir-v').addEventListener('click', function () { setDir('v'); });
   document.getElementById('dir-h').addEventListener('click', function () { setDir('h'); });
 
+  // Templates: cycle a width pattern over the images
+  document.querySelectorAll('[data-tpl]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      if (!imgs.length) return;
+      var pat = b.dataset.tpl.split(',').map(parseFloat);
+      imgs.forEach(function (im, k) { im.sc = pat[k % pat.length]; im.ox = 0; });
+      render(); commit('Arrange: ' + b.textContent); showToast('Arranged: ' + b.textContent);
+    });
+  });
+
+  // Presets: named sets of adjustments (not geometry or auto levels), kept in localStorage
+  var PRESET_KEYS = ['br','co','sa','sh','hu','bl','op','gs','sp','inv','vg','rc','tp','tn','bw','bc','sd'];
+  var presetSel = document.getElementById('preset-select');
+  function loadPresets() { try { return JSON.parse(localStorage.getItem('cm-presets') || '{}'); } catch (e) { return {}; } }
+  function savePresets(p) { try { localStorage.setItem('cm-presets', JSON.stringify(p)); } catch (e) {} }
+  function fillPresetSelect() {
+    var p = loadPresets(), names = Object.keys(p).sort();
+    presetSel.innerHTML = '<option value="">Apply preset…</option>' + names.map(function (n) { return '<option value="' + n.replace(/"/g, '&quot;') + '">' + n.replace(/</g, '&lt;') + '</option>'; }).join('');
+  }
+  fillPresetSelect();
+  document.getElementById('preset-save').addEventListener('click', function () {
+    if (sel === null) return;
+    var name = prompt('Preset name', 'My preset'); if (!name) return;
+    var p = loadPresets(), src = normEnhance(imgs[sel].enhance), rec = {};
+    PRESET_KEYS.forEach(function (k) { rec[k] = src[k]; });
+    p[name.trim()] = rec; savePresets(p); fillPresetSelect(); presetSel.value = name.trim(); showToast('Preset saved');
+  });
+  document.getElementById('preset-del').addEventListener('click', function () {
+    var n = presetSel.value; if (!n) return;
+    var p = loadPresets(); delete p[n]; savePresets(p); fillPresetSelect(); showToast('Preset deleted');
+  });
+  presetSel.addEventListener('change', function () {
+    var n = presetSel.value; if (!n || sel === null) return;
+    var rec = loadPresets()[n]; if (!rec) return;
+    selIdx().forEach(function (k) { Object.keys(rec).forEach(function (key) { imgs[k].enhance[key] = rec[key]; }); });
+    refreshPreviews(selIdx()); showPanel(sel); commit('Preset: ' + n); showToast('Applied ' + n);
+  });
+
   function setFormat(fmt) {
     exportFmt = fmt;
     document.querySelectorAll('[data-fmt]').forEach(function (b) { b.classList.toggle('on', b.dataset.fmt === fmt); });
@@ -1800,7 +1881,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     var vals = { br: parseInt(eBr.value, 10), co: parseInt(eCo.value, 10), sa: parseInt(eSa.value, 10), sh: parseInt(eSh.value, 10),
                  hu: parseInt(eHu.value, 10), bl: parseInt(eBl.value, 10), op: parseInt(eOp.value, 10),
                  rot: parseFloat(eRot.value) || 0, vg: parseInt(eVg.value, 10), rc: parseInt(eRc.value, 10),
-                 tp: parseInt(eTp.value, 10), tn: parseInt(eTn.value, 10) };
+                 tp: parseInt(eTp.value, 10), tn: parseInt(eTn.value, 10), bw: parseInt(eBw.value, 10), bc: eBc.value, sd: parseInt(eSd.value, 10) };
     selIdx().forEach(function (k) {
       var e = imgs[k].enhance; Object.keys(vals).forEach(function (key) { e[key] = vals[key]; });
       var imgEl = stackEl.querySelector('.cell[data-idx="' + k + '"] img'); if (imgEl) applyPreviewStyle(imgEl, imgs[k]);
@@ -1821,11 +1902,14 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     eRcVal.textContent = e.rc + '%';  eRcVal.classList.toggle('lit', e.rc !== 0);
     eTpVal.textContent = fmtV(e.tp); eTpVal.classList.toggle('lit', e.tp !== 0);
     eTnVal.textContent = fmtV(e.tn); eTnVal.classList.toggle('lit', e.tn !== 0);
+    eBwVal.textContent = e.bw + 'px'; eBwVal.classList.toggle('lit', e.bw !== 0);
+    eSdVal.textContent = e.sd;        eSdVal.classList.toggle('lit', e.sd !== 0);
     autoBtns.forEach(function (b) { var on = (e.auto || 'off') === b.dataset.auto; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
     fxBtns.forEach(function (b) { var on = !!e[b.dataset.fx]; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
   }
   autoBtns.forEach(function (b) { b.addEventListener('click', function () { if (sel !== null) setAuto(b.dataset.auto); }); });
-  [eBr, eCo, eSa, eSh, eHu, eBl, eOp, eRot, eVg, eRc, eTp, eTn].forEach(function (el) {
+  eBc.addEventListener('input', onEnhanceChange); eBc.addEventListener('change', function () { if (sel !== null) commit('Border colour'); });
+  [eBr, eCo, eSa, eSh, eHu, eBl, eOp, eRot, eVg, eRc, eTp, eTn, eBw, eSd].forEach(function (el) {
     el.addEventListener('input', onEnhanceChange);
     el.addEventListener('change', function () { if (sel !== null) commit('Adjust ' + (el.getAttribute('aria-label') || '').toLowerCase()); });
   });
@@ -1968,7 +2052,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     if (isDefaultEnhance(e)) { mainCtx.drawImage(im, x, y, w, h); return; }
     var tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
     var tc = tmp.getContext('2d');
-    var radius = e.rc ? Math.min(w, h) * e.rc / 100 : 0;
+    var radius = e.rc ? Math.min(w, h) * e.rc / 100 : 0, k = exportRes;
     function cornerClip() { tc.beginPath(); tc.moveTo(radius, 0); tc.arcTo(w, 0, w, h, radius); tc.arcTo(w, h, 0, h, radius); tc.arcTo(0, h, 0, 0, radius); tc.arcTo(0, 0, w, 0, radius); tc.closePath(); tc.clip(); }
     tc.save();
     if (radius > 0) cornerClip();
@@ -1986,7 +2070,14 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(v.inner, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,' + v.alpha.toFixed(3) + ')');
       tc.fillStyle = gr; tc.fillRect(-w / 2, -w / 2, w, w); tc.restore();
     }
-    mainCtx.save(); mainCtx.globalAlpha = e.op / 100; mainCtx.drawImage(tmp, x, y); mainCtx.restore();
+    if (e.bw > 0) {
+      var bw = e.bw * k, r2 = Math.max(0, radius - bw / 2), hx = bw / 2;
+      tc.save(); tc.lineWidth = bw; tc.strokeStyle = e.bc || '#fff';
+      tc.beginPath(); tc.moveTo(hx + r2, hx); tc.arcTo(w - hx, hx, w - hx, h - hx, r2); tc.arcTo(w - hx, h - hx, hx, h - hx, r2); tc.arcTo(hx, h - hx, hx, hx, r2); tc.arcTo(hx, hx, w - hx, hx, r2); tc.closePath(); tc.stroke(); tc.restore();
+    }
+    mainCtx.save(); mainCtx.globalAlpha = e.op / 100;
+    if (e.sd > 0) { mainCtx.shadowColor = 'rgba(0,0,0,' + (0.35 + e.sd / 100 * 0.4).toFixed(2) + ')'; mainCtx.shadowBlur = e.sd * 0.3 * k; mainCtx.shadowOffsetY = e.sd * 0.15 * k; }
+    mainCtx.drawImage(tmp, x, y); mainCtx.restore();
   }
 
   // ── Export ──
