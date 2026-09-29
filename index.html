@@ -182,7 +182,28 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; }
 #crop-cancel-btn { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); transition: border-color 0.1s, color 0.1s; }
 #crop-cancel-btn:hover { border-color: var(--border-hover); color: var(--text); }
-#crop-apply-btn  { background: var(--accent); border: none; color: #fff; }
+#crop-apply-btn, #rt-apply  { background: var(--accent); border: none; color: #fff; }
+#rt-apply:hover { background: #ff7244; }
+#rt-cancel { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-muted); }
+#rt-cancel:hover { border-color: var(--border-hover); color: var(--text); }
+/* ── RETOUCH MODAL ── */
+#retouch-modal { display: none; position: fixed; inset: 0; z-index: 500; background: rgba(13,13,22,0.92); align-items: center; justify-content: center; }
+#retouch-modal.open { display: flex; }
+#rt-container { display: flex; flex-direction: column; gap: 10px; max-width: 94vw; max-height: 94vh; padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; }
+#rt-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+#rt-title { font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text); }
+#rt-hint { font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
+#rt-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+#rt-tools .ctrl-label { margin: 0; }
+#rt-tools .xopt { padding: 6px 10px; min-height: 32px; font-size: 11px; }
+#rt-wrap { position: relative; line-height: 0; overflow: hidden; cursor: none; touch-action: none; }
+#rt-canvas { display: block; max-width: 84vw; max-height: 62vh; }
+#rt-cursor { position: absolute; border: 1.5px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,0.6); pointer-events: none; transform: translate(-50%, -50%); display: none; }
+#rt-src { position: absolute; width: 14px; height: 14px; pointer-events: none; transform: translate(-50%, -50%); display: none; }
+#rt-src::before, #rt-src::after { content: ''; position: absolute; background: var(--accent); box-shadow: 0 0 0 1px rgba(0,0,0,0.6); }
+#rt-src::before { left: 6px; top: 0; width: 2px; height: 14px; } #rt-src::after { top: 6px; left: 0; width: 14px; height: 2px; }
+#rt-footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+#rt-footer .crop-foot-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #crop-apply-btn:hover { background: #ff7244; }
 #crop-cancel-btn:focus-visible, #crop-apply-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -671,6 +692,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
         <div class="img-action-btns">
           <button class="img-action-btn" id="img-dup" aria-label="Duplicate image" title="Duplicate this image (Cmd/Ctrl+D)">⧉ Dup</button>
           <button class="img-action-btn" id="img-crop" aria-label="Crop image">⬚ Crop</button>
+          <button class="img-action-btn" id="img-retouch" aria-label="Retouch: clone and heal brush">✎ Fix</button>
           <button class="img-action-btn" id="img-undo" disabled aria-label="Undo">↩ Undo</button>
           <button class="img-action-btn" id="img-redo" disabled aria-label="Redo">↪ Redo</button>
         </div>
@@ -743,6 +765,34 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   </main>
 </div>
 
+<div id="retouch-modal" role="dialog" aria-modal="true" aria-labelledby="rt-title">
+  <div id="rt-container">
+    <div id="rt-header">
+      <span id="rt-title">Retouch</span>
+      <span id="rt-hint">Alt-click (or Set source, then click) to pick where to copy from · paint over the flaw · [ ] changes brush size</span>
+    </div>
+    <div id="rt-tools">
+      <div class="xopt-btns" role="group" aria-label="Tool">
+        <button class="xopt on" data-rt-tool="clone" aria-pressed="true" title="Clone stamp: copies pixels exactly">Clone</button>
+        <button class="xopt" data-rt-tool="heal" aria-pressed="false" title="Healing brush: copies texture and matches the surrounding colour">Heal</button>
+      </div>
+      <span class="ctrl-label">Brush</span>
+      <input type="range" class="sl" id="rt-size" min="6" max="300" value="60" style="width:120px" aria-label="Brush size">
+      <span class="step-val" id="rt-size-val">60</span>
+      <button class="xopt" id="rt-pick" title="Next click sets the source point">⌖ Set source</button>
+      <button class="xopt" id="rt-undo" title="Undo last stroke (⌘Z)" disabled>↩ Stroke</button>
+    </div>
+    <div id="rt-wrap">
+      <canvas id="rt-canvas"></canvas>
+      <div id="rt-cursor" aria-hidden="true"></div>
+      <div id="rt-src" aria-hidden="true"></div>
+    </div>
+    <div id="rt-footer">
+      <button class="crop-foot-btn" id="rt-cancel">Cancel</button>
+      <button class="crop-foot-btn" id="rt-apply">Apply retouch</button>
+    </div>
+  </div>
+</div>
 <div id="crop-modal" role="dialog" aria-modal="true" aria-labelledby="crop-title">
   <div id="crop-container">
     <div id="crop-header">
@@ -2432,7 +2482,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   // ── Global shortcuts ──
   function inField(t) { return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable); }
   document.addEventListener('keydown', function (e) {
-    if (inField(e.target) || cropModal.classList.contains('open')) return;
+    if (inField(e.target) || cropModal.classList.contains('open') || rtModal.classList.contains('open')) return;
     var mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase();
     if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
     if (mod && k === 'y') { e.preventDefault(); redo(); return; }
@@ -2849,6 +2899,103 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       else            { if (document.activeElement === last)  { e.preventDefault(); first.focus(); } }
     }
   });
+
+  // ── Retouch: clone stamp and healing brush ──
+  var rtModal = document.getElementById('retouch-modal'), rtCanvas = document.getElementById('rt-canvas'), rtWrap = document.getElementById('rt-wrap');
+  var rtCursor = document.getElementById('rt-cursor'), rtSrcEl = document.getElementById('rt-src'), rtSizeEl = document.getElementById('rt-size'), rtSizeVal = document.getElementById('rt-size-val');
+  var rtWork = document.createElement('canvas'), rtIdx = null, rtTool = 'clone', rtSize = 60, rtSrc = null, rtPicking = false, rtStrokes = [], rtSample = null, rtOffset = null, rtLast = null, rtPid = null, rtPrevFocus = null, rtScale = 1;
+  function rtSetSize(v) { rtSize = Math.max(6, Math.min(300, v)); rtSizeEl.value = rtSize; rtSizeVal.textContent = rtSize; rtCursor.style.width = rtCursor.style.height = (rtSize * rtScale) + 'px'; }
+  function rtRefresh() { var dc = rtCanvas.getContext('2d'); dc.clearRect(0, 0, rtCanvas.width, rtCanvas.height); dc.drawImage(rtWork, 0, 0, rtCanvas.width, rtCanvas.height); }
+  function rtPos(e) { var r = rtCanvas.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * rtWork.width, y: (e.clientY - r.top) / r.height * rtWork.height }; }
+  function rtShowSrc(p) { if (!p) { rtSrcEl.style.display = 'none'; return; } rtSrcEl.style.display = 'block'; rtSrcEl.style.left = (p.x * rtScale) + 'px'; rtSrcEl.style.top = (p.y * rtScale) + 'px'; }
+  function openRetouch(idx) {
+    if (isText(imgs[idx])) return;
+    rtIdx = idx; rtPrevFocus = document.activeElement; rtSrc = null; rtStrokes = []; rtPicking = false; rtShowSrc(null);
+    var img = new Image();
+    img.onload = function () {
+      rtWork.width = img.naturalWidth; rtWork.height = img.naturalHeight;
+      rtWork.getContext('2d').drawImage(img, 0, 0);
+      var maxW = Math.min(window.innerWidth * 0.84, 1400), maxH = window.innerHeight * 0.62;
+      rtScale = Math.min(1, maxW / rtWork.width, maxH / rtWork.height);
+      rtCanvas.width = Math.max(1, Math.round(rtWork.width * rtScale)); rtCanvas.height = Math.max(1, Math.round(rtWork.height * rtScale));
+      rtCanvas.style.width = rtCanvas.width + 'px'; rtCanvas.style.height = rtCanvas.height + 'px';
+      rtRefresh(); rtSetSize(Math.round(Math.min(rtWork.width, rtWork.height) / 12));
+      document.getElementById('rt-undo').disabled = true;
+      rtModal.classList.add('open'); document.getElementById('rt-pick').focus();
+    };
+    img.src = imgs[idx].dataUrl;
+  }
+  function closeRetouch() { rtModal.classList.remove('open'); rtIdx = null; rtPid = null; if (rtPrevFocus) { rtPrevFocus.focus(); rtPrevFocus = null; } }
+  function rtMean(ctx, x, y, size) {
+    var sx = Math.max(0, Math.round(x)), sy = Math.max(0, Math.round(y)), w = Math.min(size, ctx.canvas.width - sx), h = Math.min(size, ctx.canvas.height - sy);
+    if (w <= 0 || h <= 0) return null;
+    var d = ctx.getImageData(sx, sy, w, h).data, r = 0, g = 0, b = 0, n = 0;
+    for (var i = 0; i < d.length; i += 4) { if (d[i + 3] < 8) continue; r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+    return n ? [r / n, g / n, b / n] : null;
+  }
+  function rtDab(p) {
+    var size = rtSize, r = size / 2, sx = p.x + rtOffset.x - r, sy = p.y + rtOffset.y - r, dx = p.x - r, dy = p.y - r;
+    var br = document.createElement('canvas'); br.width = size; br.height = size; var bc = br.getContext('2d');
+    bc.drawImage(rtSample, sx, sy, size, size, 0, 0, size, size);
+    if (rtTool === 'heal') {
+      // match the colour of the destination surroundings, keep the source's texture
+      var wctx = rtWork.getContext('2d'), ms = rtMean(bc, 0, 0, size), md = rtMean(wctx, dx, dy, size);
+      if (ms && md) {
+        var im = bc.getImageData(0, 0, size, size), d = im.data, dr = md[0] - ms[0], dg = md[1] - ms[1], db = md[2] - ms[2];
+        for (var i = 0; i < d.length; i += 4) { d[i] = Math.max(0, Math.min(255, d[i] + dr)); d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + dg)); d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + db)); }
+        bc.putImageData(im, 0, 0);
+      }
+    }
+    bc.globalCompositeOperation = 'destination-in';
+    var g = bc.createRadialGradient(r, r, 0, r, r, r); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(rtTool === 'heal' ? 0.35 : 0.6, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    bc.fillStyle = g; bc.fillRect(0, 0, size, size);
+    rtWork.getContext('2d').drawImage(br, dx, dy);
+  }
+  rtCanvas.addEventListener('pointerdown', function (e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault();
+    var p = rtPos(e);
+    if (e.altKey || rtPicking) { rtSrc = p; rtPicking = false; document.getElementById('rt-pick').classList.remove('on'); rtShowSrc(p); showToast('Source set — now paint'); return; }
+    if (!rtSrc) { showToast('Alt-click or use Set source first'); return; }
+    rtStrokes.push(rtWork.getContext('2d').getImageData(0, 0, rtWork.width, rtWork.height)); if (rtStrokes.length > 12) rtStrokes.shift();
+    document.getElementById('rt-undo').disabled = false;
+    rtSample = document.createElement('canvas'); rtSample.width = rtWork.width; rtSample.height = rtWork.height; rtSample.getContext('2d').drawImage(rtWork, 0, 0);
+    rtOffset = { x: rtSrc.x - p.x, y: rtSrc.y - p.y }; rtLast = p; rtPid = e.pointerId; rtCanvas.setPointerCapture(e.pointerId);
+    rtDab(p); rtRefresh();
+  });
+  rtCanvas.addEventListener('pointermove', function (e) {
+    var p = rtPos(e);
+    rtCursor.style.display = 'block'; rtCursor.style.left = (p.x * rtScale) + 'px'; rtCursor.style.top = (p.y * rtScale) + 'px';
+    if (rtPid !== e.pointerId) return;
+    e.preventDefault();
+    var dist = Math.hypot(p.x - rtLast.x, p.y - rtLast.y), step = Math.max(2, rtSize / 4), n = Math.ceil(dist / step);
+    for (var q = 1; q <= n; q++) rtDab({ x: rtLast.x + (p.x - rtLast.x) * q / n, y: rtLast.y + (p.y - rtLast.y) * q / n });
+    rtLast = p; rtRefresh(); rtShowSrc({ x: p.x + rtOffset.x, y: p.y + rtOffset.y });
+  });
+  function rtUp(e) { if (rtPid !== e.pointerId) return; rtPid = null; try { rtCanvas.releasePointerCapture(e.pointerId); } catch (err) {} rtShowSrc(rtSrc); }
+  rtCanvas.addEventListener('pointerup', rtUp); rtCanvas.addEventListener('pointercancel', rtUp);
+  rtWrap.addEventListener('pointerleave', function () { rtCursor.style.display = 'none'; });
+  function rtUndoStroke() { if (!rtStrokes.length) return; rtWork.getContext('2d').putImageData(rtStrokes.pop(), 0, 0); rtRefresh(); document.getElementById('rt-undo').disabled = !rtStrokes.length; }
+  document.getElementById('rt-undo').addEventListener('click', rtUndoStroke);
+  document.getElementById('rt-pick').addEventListener('click', function () { rtPicking = !rtPicking; this.classList.toggle('on', rtPicking); });
+  document.querySelectorAll('[data-rt-tool]').forEach(function (b) { b.addEventListener('click', function () { rtTool = b.dataset.rtTool; document.querySelectorAll('[data-rt-tool]').forEach(function (o) { var on = o === b; o.classList.toggle('on', on); o.setAttribute('aria-pressed', on ? 'true' : 'false'); }); }); });
+  rtSizeEl.addEventListener('input', function () { rtSetSize(parseInt(rtSizeEl.value, 10)); });
+  document.getElementById('rt-cancel').addEventListener('click', closeRetouch);
+  document.getElementById('rt-apply').addEventListener('click', function () {
+    if (rtIdx === null) return;
+    var im = imgs[rtIdx], url = isTransparentCut(im) ? rtWork.toDataURL('image/png') : rtWork.toDataURL('image/jpeg', 0.96);
+    if (!rtStrokes.length) { closeRetouch(); return; }
+    im.dataUrl = url; im.w = rtWork.width; im.h = rtWork.height; im.size = calcSize(url);
+    render(); syncTotalSize(); commit('Retouch'); if (sel !== null) showPanel(sel); closeRetouch(); showToast('Retouch applied');
+  });
+  document.getElementById('img-retouch').addEventListener('click', function () { if (sel !== null) openRetouch(sel); });
+  document.addEventListener('keydown', function (e) {
+    if (!rtModal.classList.contains('open')) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeRetouch(); return; }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); rtUndoStroke(); return; }
+    if (e.key === '[') { e.preventDefault(); rtSetSize(Math.round(rtSize / 1.2)); }
+    if (e.key === ']') { e.preventDefault(); rtSetSize(Math.round(rtSize * 1.2)); }
+  }, true);
 
   // ── Service worker ──
   console.log('picstack build v4');
