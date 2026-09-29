@@ -236,7 +236,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 }
 .cell.filled { cursor: grab; background: var(--surface-2); }
 .cell.filled:active { cursor: grabbing; }
-.cell.filled img { display: block; width: 100%; height: auto; pointer-events: none; user-select: none; }
+.cell.filled img { display: block; width: 100%; height: auto; pointer-events: none; user-select: none; transform-origin: 50% 50%; }
+.cell-vig { position: absolute; inset: 0; pointer-events: none; display: none; }
 #stack.h .cell.filled img { width: auto; height: 100%; }
 .cell.filled.drag-on { box-shadow: inset 0 0 0 2px var(--accent); }
 .cell.filled.dragging { opacity: 0.35; }
@@ -460,6 +461,18 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
           <div class="enh-header"><span class="enh-label">Opacity</span><span class="enh-val" id="e-op-val">100%</span></div>
           <input type="range" class="sl enh-sl" id="e-op" min="0" max="100" value="100" aria-label="Opacity">
         </div>
+        <div class="enh-row">
+          <div class="enh-header"><span class="enh-label">Straighten</span><span class="enh-val" id="e-rot-val">0°</span></div>
+          <input type="range" class="sl enh-sl" id="e-rot" min="-45" max="45" value="0" step="0.5" aria-label="Straighten">
+        </div>
+        <div class="enh-row">
+          <div class="enh-header"><span class="enh-label">Vignette</span><span class="enh-val" id="e-vg-val">0</span></div>
+          <input type="range" class="sl enh-sl" id="e-vg" min="0" max="100" value="0" aria-label="Vignette">
+        </div>
+        <div class="enh-row">
+          <div class="enh-header"><span class="enh-label">Corners</span><span class="enh-val" id="e-rc-val">0%</span></div>
+          <input type="range" class="sl enh-sl" id="e-rc" min="0" max="50" value="0" aria-label="Rounded corners">
+        </div>
         <div class="ctrl-row" style="margin-bottom:10px" role="group" aria-label="Effects">
           <span class="ctrl-label">Effect</span>
           <div class="xopt-btns">
@@ -674,13 +687,16 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   var eHu = document.getElementById('e-hu'), eHuVal = document.getElementById('e-hu-val');
   var eBl = document.getElementById('e-bl'), eBlVal = document.getElementById('e-bl-val');
   var eOp = document.getElementById('e-op'), eOpVal = document.getElementById('e-op-val');
+  var eRot = document.getElementById('e-rot'), eRotVal = document.getElementById('e-rot-val');
+  var eVg = document.getElementById('e-vg'), eVgVal = document.getElementById('e-vg-val');
+  var eRc = document.getElementById('e-rc'), eRcVal = document.getElementById('e-rc-val');
   var fxBtns = document.querySelectorAll('[data-fx]');
   var installBar  = document.getElementById('install-bar');
   var installBtn  = document.getElementById('install-btn');
   var installDismiss = document.getElementById('install-dismiss');
 
   // ── Helpers ──
-  function defaultEnhance() { return { br:0, co:0, sa:0, sh:0, hu:0, bl:0, op:100, gs:false, sp:false, inv:false }; }
+  function defaultEnhance() { return { br:0, co:0, sa:0, sh:0, hu:0, bl:0, op:100, gs:false, sp:false, inv:false, rot:0, vg:0, rc:0 }; }
   function normEnhance(e) {
     var d = defaultEnhance(); e = e || {};
     Object.keys(d).forEach(function (k) { if (e[k] === undefined || e[k] === null) e[k] = d[k]; });
@@ -1021,9 +1037,29 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     if (e.bl)  f += ' blur(' + e.bl + 'px)';
     return f;
   }
-  function applyPreviewStyle(imgEl, e) {
+  // straighten: scale so the rotated image still covers its frame (Photoshop's "crop to fill")
+  function coverScale(w, h, deg) {
+    var r = Math.abs(deg) * Math.PI / 180, c = Math.cos(r), sn = Math.sin(r);
+    return Math.max((w * c + h * sn) / w, (w * sn + h * c) / h);
+  }
+  function vigStops(vg) { return { inner: Math.max(0.15, 0.75 - vg / 100 * 0.45), alpha: vg / 100 * 0.85 }; }
+  function applyPreviewStyle(imgEl, im) {
+    var e = normEnhance(im.enhance);
     imgEl.style.filter = imgFilter(e);
     imgEl.style.opacity = e.op === 100 ? '' : (e.op / 100);
+    imgEl.style.transform = e.rot ? 'rotate(' + e.rot + 'deg) scale(' + coverScale(im.w || 4, im.h || 3, e.rot).toFixed(4) + ')' : '';
+    // corners as px of the shorter displayed side, estimated from the layout fraction
+    var dispW = (stackDir === 'h' ? (sizeOf(im).sc * stackW) * ((im.w || 4) / (im.h || 3)) : sizeOf(im).sc * stackW);
+    var shortSide = Math.min(dispW, dispW * (im.h || 3) / (im.w || 4));
+    var radius = e.rc ? Math.round(shortSide * e.rc / 100) + 'px' : '';
+    var cell = imgEl.parentNode;
+    if (cell) { cell.style.borderRadius = radius; }
+    var vig = cell ? cell.querySelector('.cell-vig') : null;
+    if (vig) {
+      if (e.vg > 0) { var v = vigStops(e.vg); vig.style.display = 'block'; vig.style.borderRadius = radius;
+        vig.style.background = 'radial-gradient(ellipse farthest-corner at center, transparent ' + Math.round(v.inner * 100) + '%, rgba(0,0,0,' + v.alpha.toFixed(3) + ') 100%)'; }
+      else vig.style.display = 'none';
+    }
   }
 
   // ── Background removal ──
@@ -1155,6 +1191,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     }
     e = imgs[i].enhance = normEnhance(e);
     eBr.value = e.br; eCo.value = e.co; eSa.value = e.sa; eSh.value = e.sh; eHu.value = e.hu; eBl.value = e.bl; eOp.value = e.op;
+    eRot.value = e.rot; eVg.value = e.vg; eRc.value = e.rc;
     syncEnhanceLabels(e);
     var cut = imgs[i].cut;
     document.getElementById('bgfill-controls').style.display = cut ? 'block' : 'none';
@@ -1187,9 +1224,10 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     cell.dataset.idx = i; cell.setAttribute('role', 'listitem');
     var imgEl = document.createElement('img');
     imgEl.src = imgs[i].dataUrl; imgEl.alt = imgs[i].name || ('Image ' + (i + 1));
-    applyPreviewStyle(imgEl, imgs[i].enhance);
     if (isTransparentCut(imgs[i])) imgEl.classList.add('alpha-check');
     cell.appendChild(imgEl);
+    var vigEl = document.createElement('div'); vigEl.className = 'cell-vig'; vigEl.setAttribute('aria-hidden', 'true'); cell.appendChild(vigEl);
+    applyPreviewStyle(imgEl, imgs[i]);
     applySize(cell, imgs[i]);
     ['nw','ne','sw','se'].forEach(function (k) { var h = document.createElement('div'); h.className = 'rs-h ' + k; h.setAttribute('aria-hidden','true'); h.title = 'Drag to resize'; cell.appendChild(h); });
     var rsLabel = document.createElement('div'); rsLabel.className = 'rs-label'; cell.appendChild(rsLabel);
@@ -1679,10 +1717,11 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   function onEnhanceChange() {
     if (sel === null) return;
     var vals = { br: parseInt(eBr.value, 10), co: parseInt(eCo.value, 10), sa: parseInt(eSa.value, 10), sh: parseInt(eSh.value, 10),
-                 hu: parseInt(eHu.value, 10), bl: parseInt(eBl.value, 10), op: parseInt(eOp.value, 10) };
+                 hu: parseInt(eHu.value, 10), bl: parseInt(eBl.value, 10), op: parseInt(eOp.value, 10),
+                 rot: parseFloat(eRot.value) || 0, vg: parseInt(eVg.value, 10), rc: parseInt(eRc.value, 10) };
     selIdx().forEach(function (k) {
       var e = imgs[k].enhance; Object.keys(vals).forEach(function (key) { e[key] = vals[key]; });
-      var imgEl = stackEl.querySelector('.cell[data-idx="' + k + '"] img'); if (imgEl) applyPreviewStyle(imgEl, e);
+      var imgEl = stackEl.querySelector('.cell[data-idx="' + k + '"] img'); if (imgEl) applyPreviewStyle(imgEl, imgs[k]);
     });
     syncEnhanceLabels(imgs[sel].enhance);
     saveState();
@@ -1695,9 +1734,12 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     eHuVal.textContent = e.hu + '°';  eHuVal.classList.toggle('lit', e.hu !== 0);
     eBlVal.textContent = e.bl;        eBlVal.classList.toggle('lit', e.bl !== 0);
     eOpVal.textContent = e.op + '%';  eOpVal.classList.toggle('lit', e.op !== 100);
+    eRotVal.textContent = (e.rot > 0 ? '+' : '') + e.rot + '°'; eRotVal.classList.toggle('lit', e.rot !== 0);
+    eVgVal.textContent = e.vg;        eVgVal.classList.toggle('lit', e.vg !== 0);
+    eRcVal.textContent = e.rc + '%';  eRcVal.classList.toggle('lit', e.rc !== 0);
     fxBtns.forEach(function (b) { var on = !!e[b.dataset.fx]; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
   }
-  [eBr, eCo, eSa, eSh, eHu, eBl, eOp].forEach(function (el) {
+  [eBr, eCo, eSa, eSh, eHu, eBl, eOp, eRot, eVg, eRc].forEach(function (el) {
     el.addEventListener('input', onEnhanceChange);
     el.addEventListener('change', function () { if (sel !== null) commit('Adjust ' + (el.getAttribute('aria-label') || '').toLowerCase()); });
   });
@@ -1840,8 +1882,23 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     if (isDefaultEnhance(e)) { mainCtx.drawImage(im, x, y, w, h); return; }
     var tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
     var tc = tmp.getContext('2d');
-    tc.filter = imgFilter(e); tc.drawImage(im, 0, 0, w, h); tc.filter = 'none';
+    var radius = e.rc ? Math.min(w, h) * e.rc / 100 : 0;
+    function cornerClip() { tc.beginPath(); tc.moveTo(radius, 0); tc.arcTo(w, 0, w, h, radius); tc.arcTo(w, h, 0, h, radius); tc.arcTo(0, h, 0, 0, radius); tc.arcTo(0, 0, w, 0, radius); tc.closePath(); tc.clip(); }
+    tc.save();
+    if (radius > 0) cornerClip();
+    tc.filter = imgFilter(e);
+    if (e.rot) { var sc = coverScale(w, h, e.rot); tc.translate(w / 2, h / 2); tc.rotate(e.rot * Math.PI / 180); tc.scale(sc, sc); tc.drawImage(im, -w / 2, -h / 2, w, h); }
+    else tc.drawImage(im, 0, 0, w, h);
+    tc.restore();
     if (e.sh > 0) applySharpen(tc, w, h, e.sh);
+    if (e.vg > 0) {
+      var v = vigStops(e.vg);
+      tc.save(); if (radius > 0) cornerClip();
+      tc.translate(w / 2, h / 2); tc.scale(1, h / w);
+      var R = (w / 2) * Math.SQRT2, gr = tc.createRadialGradient(0, 0, 0, 0, 0, R);
+      gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(v.inner, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,' + v.alpha.toFixed(3) + ')');
+      tc.fillStyle = gr; tc.fillRect(-w / 2, -w / 2, w, w); tc.restore();
+    }
     mainCtx.save(); mainCtx.globalAlpha = e.op / 100; mainCtx.drawImage(tmp, x, y); mainCtx.restore();
   }
 
