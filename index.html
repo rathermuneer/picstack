@@ -264,6 +264,15 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   color: var(--text); font-family: inherit; font-size: 12px; padding: 8px; resize: vertical; margin-bottom: 8px; }
 #txt-controls select { width: 100%; background: var(--surface-2); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 12px; padding: 6px 8px; border-radius: 3px; margin-bottom: 8px; }
 .cell-border { position: absolute; inset: 0; pointer-events: none; display: none; }
+#stack { background: var(--stack-bg, transparent); }
+#stack.alpha-check { background: repeating-conic-gradient(#b8b8c4 0% 25%, #ececf2 0% 50%) 0 0/16px 16px; }
+#curve-wrap { margin: 4px 0 10px; }
+#curve-canvas { display: block; width: 100%; height: 150px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 3px; cursor: crosshair; touch-action: none; }
+.curve-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.curve-ch { display: flex; gap: 3px; }
+.curve-ch .xopt { padding: 4px 8px; min-height: 26px; font-size: 10px; }
+.curve-ch .xopt.r.on { background: #e05252; border-color: #e05252; } .curve-ch .xopt.g.on { background: #3fa34d; border-color: #3fa34d; } .curve-ch .xopt.b.on { background: #3b7ddd; border-color: #3b7ddd; }
+.enh-select { width: 100%; background: var(--surface-2); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 12px; padding: 6px 8px; border-radius: 3px; }
 .preset-row { display: flex; gap: 4px; margin: 4px 0 8px; }
 .preset-row select { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border); color: var(--text); font-family: inherit; font-size: 12px; padding: 6px 8px; border-radius: 3px; }
 .preset-row button { min-width: 36px; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 3px; color: var(--text-muted); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
@@ -550,6 +559,19 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
             <button class="xopt on" data-auto="off" aria-pressed="true" title="No auto levels">Off</button>
           </div>
         </div>
+        <div id="curve-wrap">
+          <div class="curve-head">
+            <span class="enh-label">Curves</span>
+            <div class="curve-ch" role="group" aria-label="Curve channel">
+              <button class="xopt on" data-cch="rgb" aria-pressed="true">RGB</button>
+              <button class="xopt r" data-cch="r" aria-pressed="false">R</button>
+              <button class="xopt g" data-cch="g" aria-pressed="false">G</button>
+              <button class="xopt b" data-cch="b" aria-pressed="false">B</button>
+              <button class="xopt" id="curve-reset" title="Reset curves">↺</button>
+            </div>
+          </div>
+          <canvas id="curve-canvas" width="260" height="150" role="img" aria-label="Curves editor: click to add a point, drag to move, double-click to remove"></canvas>
+        </div>
         <div class="enh-row">
           <div class="enh-header"><span class="enh-label">Sharpen</span><span class="enh-val" id="e-sh-val">0</span></div>
           <input type="range" class="sl enh-sl" id="e-sh" min="0" max="100" value="0" aria-label="Sharpen">
@@ -567,6 +589,16 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
           <input type="range" class="sl enh-sl" id="e-op" min="0" max="100" value="100" aria-label="Opacity">
         </div>
         <div class="enh-row">
+          <div class="enh-header"><span class="enh-label">Blend</span><span class="enh-val" id="e-bm-val"></span></div>
+          <select class="enh-select" id="e-bm" aria-label="Blend mode with the background">
+            <option value="normal">Normal</option><option value="multiply">Multiply</option><option value="screen">Screen</option>
+            <option value="overlay">Overlay</option><option value="darken">Darken</option><option value="lighten">Lighten</option>
+            <option value="color-dodge">Colour dodge</option><option value="color-burn">Colour burn</option><option value="soft-light">Soft light</option>
+            <option value="hard-light">Hard light</option><option value="difference">Difference</option><option value="exclusion">Exclusion</option>
+            <option value="hue">Hue</option><option value="saturation">Saturation</option><option value="color">Colour</option><option value="luminosity">Luminosity</option>
+          </select>
+        </div>
+        <div class="enh-row">
           <div class="enh-header"><span class="enh-label">Straighten</span><span class="enh-val" id="e-rot-val">0°</span></div>
           <input type="range" class="sl enh-sl" id="e-rot" min="-45" max="45" value="0" step="0.5" aria-label="Straighten">
         </div>
@@ -577,6 +609,22 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
         <div class="enh-row">
           <div class="enh-header"><span class="enh-label">Corners</span><span class="enh-val" id="e-rc-val">0%</span></div>
           <input type="range" class="sl enh-sl" id="e-rc" min="0" max="50" value="0" aria-label="Rounded corners">
+        </div>
+        <div class="enh-row">
+          <div class="enh-header"><span class="enh-label">Fade edges</span><span class="enh-val" id="e-fd-val">0%</span></div>
+          <input type="range" class="sl enh-sl" id="e-fd" min="0" max="50" value="0" aria-label="Fade edges">
+        </div>
+        <div class="ctrl-row" style="margin-bottom:10px" role="group" aria-label="Fade which edges">
+          <span class="ctrl-label">Edges</span>
+          <div class="xopt-btns">
+            <button class="xopt on" data-fe="all" aria-pressed="true" title="All edges">All</button>
+            <button class="xopt" data-fe="lr" aria-pressed="false" title="Left and right">◫</button>
+            <button class="xopt" data-fe="tb" aria-pressed="false" title="Top and bottom">⊟</button>
+            <button class="xopt" data-fe="l" aria-pressed="false" title="Left">◧</button>
+            <button class="xopt" data-fe="r" aria-pressed="false" title="Right">◨</button>
+            <button class="xopt" data-fe="t" aria-pressed="false" title="Top">⬒</button>
+            <button class="xopt" data-fe="b" aria-pressed="false" title="Bottom">⬓</button>
+          </div>
         </div>
         <div class="enh-row">
           <div class="enh-header"><span class="enh-label">Border</span><span class="enh-val" id="e-bw-val">0</span></div>
@@ -817,6 +865,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   var eTn = document.getElementById('e-tn'), eTnVal = document.getElementById('e-tn-val');
   var eBw = document.getElementById('e-bw'), eBwVal = document.getElementById('e-bw-val'), eBc = document.getElementById('e-bc');
   var eSd = document.getElementById('e-sd'), eSdVal = document.getElementById('e-sd-val');
+  var eBm = document.getElementById('e-bm'), eFd = document.getElementById('e-fd'), eFdVal = document.getElementById('e-fd-val'), feBtns = document.querySelectorAll('[data-fe]');
   var autoBtns = document.querySelectorAll('[data-auto]');
   var fxBtns = document.querySelectorAll('[data-fx]');
   var installBar  = document.getElementById('install-bar');
@@ -824,7 +873,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   var installDismiss = document.getElementById('install-dismiss');
 
   // ── Helpers ──
-  function defaultEnhance() { return { br:0, co:0, sa:0, sh:0, hu:0, bl:0, op:100, gs:false, sp:false, inv:false, rot:0, vg:0, rc:0, tp:0, tn:0, lv:null, auto:'off', bw:0, bc:'#ffffff', sd:0 }; }
+  function defaultEnhance() { return { br:0, co:0, sa:0, sh:0, hu:0, bl:0, op:100, gs:false, sp:false, inv:false, rot:0, vg:0, rc:0, tp:0, tn:0, lv:null, auto:'off', bw:0, bc:'#ffffff', sd:0, bm:'normal', fd:0, fe:'all', cv:null }; }
   function normEnhance(e) {
     var d = defaultEnhance(); e = e || {};
     Object.keys(d).forEach(function (k) { if (e[k] === undefined || e[k] === null) e[k] = d[k]; });
@@ -832,7 +881,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   }
   function isDefaultEnhance(e) {
     var d = defaultEnhance();
-    return Object.keys(d).every(function (k) { return k === 'lv' ? !e.lv : e[k] === d[k]; });
+    return Object.keys(d).every(function (k) { return (k === 'lv' || k === 'cv') ? !e[k] : e[k] === d[k]; });
   }
   function uid() { return Math.random().toString(36).slice(2); }
   function isText(im) { return !!im && im.type === 'text'; }
@@ -1210,16 +1259,79 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     a[1] *= 1 - 0.2 * n;                        // + magenta / − green
     return { a: a, b: b, identity: a[0] === 1 && a[1] === 1 && a[2] === 1 && b[0] === 0 && b[1] === 0 && b[2] === 0 };
   }
-  function matrixFilterUrl(im) {
-    var m = colorMatrix(normEnhance(im.enhance)), defs = document.getElementById('cm-defs'), id = 'cm-' + im.id;
-    var f = document.getElementById(id);
-    if (m.identity) { if (f) f.parentNode.removeChild(f); return ''; }
-    if (!f) {
-      f = document.createElementNS('http://www.w3.org/2000/svg', 'filter'); f.id = id; f.setAttribute('color-interpolation-filters', 'sRGB');
-      var fe = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix'); fe.setAttribute('type', 'matrix'); f.appendChild(fe); defs.appendChild(f);
+  // ── Curves: points per channel → 256-entry LUTs (monotone cubic through the points) ──
+  function curveLut(points) {
+    var lut = new Uint8ClampedArray(256), pts = (points || [[0, 0], [255, 255]]).slice().sort(function (a, b) { return a[0] - b[0]; });
+    if (pts.length < 2) pts = [[0, 0], [255, 255]];
+    var n = pts.length, xs = pts.map(function (p) { return p[0]; }), ys = pts.map(function (p) { return p[1]; });
+    var d = [], m = [];
+    for (var i = 0; i < n - 1; i++) d.push((ys[i + 1] - ys[i]) / Math.max(1, xs[i + 1] - xs[i]));
+    m[0] = d[0]; m[n - 1] = d[n - 2];
+    for (i = 1; i < n - 1; i++) m[i] = (d[i - 1] * d[i] <= 0) ? 0 : (d[i - 1] + d[i]) / 2;
+    for (i = 0; i < n - 1; i++) { if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; } else { var a = m[i] / d[i], b = m[i + 1] / d[i], s2 = a * a + b * b; if (s2 > 9) { var t = 3 / Math.sqrt(s2); m[i] = t * a * d[i]; m[i + 1] = t * b * d[i]; } } }
+    for (var x = 0; x < 256; x++) {
+      if (x <= xs[0]) { lut[x] = ys[0]; continue; } if (x >= xs[n - 1]) { lut[x] = ys[n - 1]; continue; }
+      var k = 0; while (k < n - 2 && x > xs[k + 1]) k++;
+      var h = xs[k + 1] - xs[k], tt = (x - xs[k]) / h, t2 = tt * tt, t3 = t2 * tt;
+      lut[x] = (2 * t3 - 3 * t2 + 1) * ys[k] + (t3 - 2 * t2 + tt) * h * m[k] + (-2 * t3 + 3 * t2) * ys[k + 1] + (t3 - t2) * h * m[k + 1];
     }
-    var v = [m.a[0], 0, 0, 0, m.b[0], 0, m.a[1], 0, 0, m.b[1], 0, 0, m.a[2], 0, m.b[2], 0, 0, 0, 1, 0].map(function (x) { return +x.toFixed(4); }).join(' ');
-    f.firstChild.setAttribute('values', v);
+    return lut;
+  }
+  function curveLuts(cv) {
+    if (!cv) return null;
+    var master = curveLut(cv.rgb), out = [], any = false;
+    ['r', 'g', 'b'].forEach(function (ch) { var l = curveLut(cv[ch]), full = new Uint8ClampedArray(256); for (var x = 0; x < 256; x++) { full[x] = l[master[x]]; if (full[x] !== x) any = true; } out.push(full); });
+    return any ? out : null;
+  }
+  function applyLutPixels(ctx, w, h, luts) {
+    var img = ctx.getImageData(0, 0, w, h), d = img.data;
+    for (var i = 0; i < d.length; i += 4) { d[i] = luts[0][d[i]]; d[i + 1] = luts[1][d[i + 1]]; d[i + 2] = luts[2][d[i + 2]]; }
+    ctx.putImageData(img, 0, 0);
+  }
+  function fadeMask(e) {
+    if (!e.fd) return '';
+    var a = e.fd, gs = [], fe = e.fe || 'all';
+    var lr = 'linear-gradient(to right, transparent, #000 ' + a + '%, #000 ' + (100 - a) + '%, transparent)';
+    var tb = 'linear-gradient(to bottom, transparent, #000 ' + a + '%, #000 ' + (100 - a) + '%, transparent)';
+    if (fe === 'all') gs = [lr, tb]; else if (fe === 'lr') gs = [lr]; else if (fe === 'tb') gs = [tb];
+    else if (fe === 'l') gs = ['linear-gradient(to right, transparent, #000 ' + a + '%)']; else if (fe === 'r') gs = ['linear-gradient(to left, transparent, #000 ' + a + '%)'];
+    else if (fe === 't') gs = ['linear-gradient(to bottom, transparent, #000 ' + a + '%)']; else if (fe === 'b') gs = ['linear-gradient(to top, transparent, #000 ' + a + '%)'];
+    return gs.join(', ');
+  }
+  function applyFadeCanvas(tc, w, h, e) {
+    if (!e.fd) return;
+    var a = e.fd / 100, fe = e.fe || 'all';
+    function grad(x0, y0, x1, y1, stops) { var g = tc.createLinearGradient(x0, y0, x1, y1); stops.forEach(function (st) { g.addColorStop(st[0], st[1]); }); return g; }
+    var passes = [];
+    var both = [[0, 'rgba(0,0,0,0)'], [a, '#000'], [1 - a, '#000'], [1, 'rgba(0,0,0,0)']], one = [[0, 'rgba(0,0,0,0)'], [a, '#000'], [1, '#000']];
+    if (fe === 'all' || fe === 'lr') passes.push(grad(0, 0, w, 0, both));
+    if (fe === 'all' || fe === 'tb') passes.push(grad(0, 0, 0, h, both));
+    if (fe === 'l') passes.push(grad(0, 0, w, 0, one)); if (fe === 'r') passes.push(grad(w, 0, 0, 0, one));
+    if (fe === 't') passes.push(grad(0, 0, 0, h, one)); if (fe === 'b') passes.push(grad(0, h, 0, 0, one));
+    tc.save(); tc.globalCompositeOperation = 'destination-in';
+    passes.forEach(function (g) { tc.fillStyle = g; tc.fillRect(0, 0, w, h); });
+    tc.restore();
+  }
+  function matrixFilterUrl(im) {
+    var e = normEnhance(im.enhance), m = colorMatrix(e), luts = curveLuts(e.cv), defs = document.getElementById('cm-defs'), id = 'cm-' + im.id;
+    var f = document.getElementById(id), NS = 'http://www.w3.org/2000/svg';
+    if (m.identity && !luts) { if (f) f.parentNode.removeChild(f); return ''; }
+    if (!f) { f = document.createElementNS(NS, 'filter'); f.id = id; f.setAttribute('color-interpolation-filters', 'sRGB'); defs.appendChild(f); }
+    while (f.firstChild) f.removeChild(f.firstChild);
+    if (!m.identity) {
+      var fe = document.createElementNS(NS, 'feColorMatrix'); fe.setAttribute('type', 'matrix');
+      fe.setAttribute('values', [m.a[0], 0, 0, 0, m.b[0], 0, m.a[1], 0, 0, m.b[1], 0, 0, m.a[2], 0, m.b[2], 0, 0, 0, 1, 0].map(function (x) { return +x.toFixed(4); }).join(' '));
+      f.appendChild(fe);
+    }
+    if (luts) {
+      var ct = document.createElementNS(NS, 'feComponentTransfer');
+      ['R', 'G', 'B'].forEach(function (ch, c) {
+        var fn = document.createElementNS(NS, 'feFunc' + ch), vals = [];
+        for (var q = 0; q < 64; q++) vals.push((luts[c][Math.round(q * 255 / 63)] / 255).toFixed(3));
+        fn.setAttribute('type', 'table'); fn.setAttribute('tableValues', vals.join(' ')); ct.appendChild(fn);
+      });
+      f.appendChild(ct);
+    }
     return 'url(#' + id + ') ';
   }
   function applyMatrixPixels(ctx, w, h, m) {
@@ -1278,11 +1390,16 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     var shortSide = Math.min(dispW, dispW * (im.h || 3) / (im.w || 4));
     var radius = e.rc ? Math.round(shortSide * e.rc / 100) + 'px' : '';
     var cell = imgEl.parentNode;
+    var mask = fadeMask(e);
+    imgEl.style.webkitMaskImage = mask; imgEl.style.maskImage = mask;
+    imgEl.style.webkitMaskComposite = mask ? 'source-in' : ''; imgEl.style.maskComposite = mask ? 'intersect' : '';
     if (cell) {
+      cell.style.mixBlendMode = (e.bm && e.bm !== 'normal') ? e.bm : '';
       cell.style.borderRadius = radius;
       cell.style.filter = e.sd > 0 ? 'drop-shadow(0 ' + (e.sd * 0.15).toFixed(1) + 'px ' + (e.sd * 0.3).toFixed(1) + 'px rgba(0,0,0,' + (0.35 + e.sd / 100 * 0.4).toFixed(2) + '))' : '';
       var bd = cell.querySelector('.cell-border');
-      if (bd) { if (e.bw > 0) { bd.style.display = 'block'; bd.style.borderRadius = radius; bd.style.boxShadow = 'inset 0 0 0 ' + e.bw + 'px ' + e.bc; } else bd.style.display = 'none'; }
+      if (bd) { if (e.bw > 0) { bd.style.display = 'block'; bd.style.borderRadius = radius; bd.style.boxShadow = 'inset 0 0 0 ' + e.bw + 'px ' + e.bc; bd.style.webkitMaskImage = mask; bd.style.maskImage = mask; bd.style.webkitMaskComposite = mask ? 'source-in' : ''; bd.style.maskComposite = mask ? 'intersect' : ''; } else bd.style.display = 'none'; }
+      var vg2 = cell.querySelector('.cell-vig'); if (vg2) { vg2.style.webkitMaskImage = mask; vg2.style.maskImage = mask; vg2.style.webkitMaskComposite = mask ? 'source-in' : ''; vg2.style.maskComposite = mask ? 'intersect' : ''; }
     }
     var vig = cell ? cell.querySelector('.cell-vig') : null;
     if (vig) {
@@ -1424,7 +1541,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     }
     e = imgs[i].enhance = normEnhance(e);
     eBr.value = e.br; eCo.value = e.co; eSa.value = e.sa; eSh.value = e.sh; eHu.value = e.hu; eBl.value = e.bl; eOp.value = e.op;
-    eRot.value = e.rot; eVg.value = e.vg; eRc.value = e.rc; eTp.value = e.tp; eTn.value = e.tn; eBw.value = e.bw; eBc.value = e.bc; eSd.value = e.sd;
+    eRot.value = e.rot; eVg.value = e.vg; eRc.value = e.rc; eTp.value = e.tp; eTn.value = e.tn; eBw.value = e.bw; eBc.value = e.bc; eSd.value = e.sd; eBm.value = e.bm || 'normal'; eFd.value = e.fd; drawCurveEditor();
     syncEnhanceLabels(e);
     var cut = imgs[i].cut;
     document.getElementById('bgfill-controls').style.display = cut ? 'block' : 'none';
@@ -1441,6 +1558,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
   // ── Render ──
   function render() {
+    stackEl.style.setProperty('--stack-bg', bg === 'transparent' ? 'transparent' : bg);
+    stackEl.classList.toggle('alpha-check', bg === 'transparent');
     stackEl.style.setProperty('--g', gap + 'px');
     stackEl.style.setProperty('--stack-w', stackW + 'px');
     stackEl.classList.toggle('h', stackDir === 'h');
@@ -1933,11 +2052,11 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
         setFormat('png');
         showToast('Transparent background — format set to PNG');
       }
-      saveState();
+      saveState(); render();
     });
     sw.tabIndex = 0; sw.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sw.click(); } });
   });
-  document.getElementById('custom-bg').addEventListener('input', function (e) { bg = e.target.value; document.querySelectorAll('.swatch[data-bg]').forEach(function (s) { s.classList.remove('on'); }); saveState(); });
+  document.getElementById('custom-bg').addEventListener('input', function (e) { bg = e.target.value; document.querySelectorAll('.swatch[data-bg]').forEach(function (s) { s.classList.remove('on'); }); saveState(); render(); });
 
   // ── Remove background controls ──
   var removeBgBtn = document.getElementById('img-removebg');
@@ -2078,7 +2197,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     var vals = { br: parseInt(eBr.value, 10), co: parseInt(eCo.value, 10), sa: parseInt(eSa.value, 10), sh: parseInt(eSh.value, 10),
                  hu: parseInt(eHu.value, 10), bl: parseInt(eBl.value, 10), op: parseInt(eOp.value, 10),
                  rot: parseFloat(eRot.value) || 0, vg: parseInt(eVg.value, 10), rc: parseInt(eRc.value, 10),
-                 tp: parseInt(eTp.value, 10), tn: parseInt(eTn.value, 10), bw: parseInt(eBw.value, 10), bc: eBc.value, sd: parseInt(eSd.value, 10) };
+                 tp: parseInt(eTp.value, 10), tn: parseInt(eTn.value, 10), bw: parseInt(eBw.value, 10), bc: eBc.value, sd: parseInt(eSd.value, 10), bm: eBm.value, fd: parseInt(eFd.value, 10) };
     selIdx().forEach(function (k) {
       var e = imgs[k].enhance; Object.keys(vals).forEach(function (key) { e[key] = vals[key]; });
       var imgEl = stackEl.querySelector('.cell[data-idx="' + k + '"] img'); if (imgEl) applyPreviewStyle(imgEl, imgs[k]);
@@ -2101,12 +2220,17 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     eTnVal.textContent = fmtV(e.tn); eTnVal.classList.toggle('lit', e.tn !== 0);
     eBwVal.textContent = e.bw + 'px'; eBwVal.classList.toggle('lit', e.bw !== 0);
     eSdVal.textContent = e.sd;        eSdVal.classList.toggle('lit', e.sd !== 0);
+    eFdVal.textContent = e.fd + '%';  eFdVal.classList.toggle('lit', e.fd !== 0);
+    document.getElementById('e-bm-val').textContent = (e.bm && e.bm !== 'normal') ? '●' : '';
+    feBtns.forEach(function (b) { var on = (e.fe || 'all') === b.dataset.fe; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
     autoBtns.forEach(function (b) { var on = (e.auto || 'off') === b.dataset.auto; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
     fxBtns.forEach(function (b) { var on = !!e[b.dataset.fx]; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
   }
   autoBtns.forEach(function (b) { b.addEventListener('click', function () { if (sel !== null) setAuto(b.dataset.auto); }); });
   eBc.addEventListener('input', onEnhanceChange); eBc.addEventListener('change', function () { if (sel !== null) commit('Border colour'); });
-  [eBr, eCo, eSa, eSh, eHu, eBl, eOp, eRot, eVg, eRc, eTp, eTn, eBw, eSd].forEach(function (el) {
+  eBm.addEventListener('change', function () { if (sel === null) return; onEnhanceChange(); commit('Blend mode'); });
+  feBtns.forEach(function (b) { b.addEventListener('click', function () { if (sel === null) return; selIdx().forEach(function (k) { imgs[k].enhance.fe = b.dataset.fe; }); onEnhanceChange(); commit('Fade edges'); }); });
+  [eBr, eCo, eSa, eSh, eHu, eBl, eOp, eRot, eVg, eRc, eTp, eTn, eBw, eSd, eFd].forEach(function (el) {
     el.addEventListener('input', onEnhanceChange);
     el.addEventListener('change', function () { if (sel !== null) commit('Adjust ' + (el.getAttribute('aria-label') || '').toLowerCase()); });
   });
@@ -2194,6 +2318,54 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     for (var k = 0; k < items.length; k++) if (items[k].kind === 'file' && items[k].type.indexOf('image/') === 0) { var f = items[k].getAsFile(); if (f) files.push(f); }
     if (files.length) { e.preventDefault(); loadFiles(files); }
   });
+
+  // ── Curves editor ──
+  var curveCanvas = document.getElementById('curve-canvas'), curveCh = 'rgb', curveDrag = null;
+  function curPoints() { var e = sel !== null ? imgs[sel].enhance : null; if (!e) return [[0, 0], [255, 255]]; if (!e.cv) e.cv = {}; if (!e.cv[curveCh]) e.cv[curveCh] = [[0, 0], [255, 255]]; return e.cv[curveCh]; }
+  function drawCurveEditor() {
+    var ctx = curveCanvas.getContext('2d'), W = curveCanvas.width, H = curveCanvas.height;
+    ctx.clearRect(0, 0, W, H);
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+    for (var q = 1; q < 4; q++) { ctx.beginPath(); ctx.moveTo(W * q / 4, 0); ctx.lineTo(W * q / 4, H); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, H * q / 4); ctx.lineTo(W, H * q / 4); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.moveTo(0, H); ctx.lineTo(W, 0); ctx.stroke();
+    var e = sel !== null ? normEnhance(imgs[sel].enhance) : null, pts = e && e.cv && e.cv[curveCh] ? e.cv[curveCh] : [[0, 0], [255, 255]];
+    var lut = curveLut(pts), col = curveCh === 'r' ? '#e05252' : curveCh === 'g' ? '#3fa34d' : curveCh === 'b' ? '#3b7ddd' : '#FF5C2B';
+    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath();
+    for (var x = 0; x < 256; x++) { var px = x / 255 * W, py = H - lut[x] / 255 * H; if (x === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); }
+    ctx.stroke();
+    pts.forEach(function (p) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p[0] / 255 * W, H - p[1] / 255 * H, 4, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke(); });
+  }
+  function curvePos(ev) { var r = curveCanvas.getBoundingClientRect(); return { x: Math.max(0, Math.min(255, (ev.clientX - r.left) / r.width * 255)), y: Math.max(0, Math.min(255, (1 - (ev.clientY - r.top) / r.height) * 255)) }; }
+  function curveChanged(final) {
+    if (sel === null) return;
+    var cv = JSON.parse(JSON.stringify(imgs[sel].enhance.cv));
+    selIdx().forEach(function (k) { imgs[k].enhance.cv = JSON.parse(JSON.stringify(cv)); });
+    refreshPreviews(selIdx()); drawCurveEditor();
+    if (final) commit('Curves'); else saveState();
+  }
+  document.querySelectorAll('[data-cch]').forEach(function (b) { b.addEventListener('click', function () { curveCh = b.dataset.cch; document.querySelectorAll('[data-cch]').forEach(function (o) { var on = o === b; o.classList.toggle('on', on); o.setAttribute('aria-pressed', on ? 'true' : 'false'); }); drawCurveEditor(); }); });
+  document.getElementById('curve-reset').addEventListener('click', function () { if (sel === null) return; selIdx().forEach(function (k) { imgs[k].enhance.cv = null; }); refreshPreviews(selIdx()); drawCurveEditor(); commit('Reset curves'); });
+  var curveLastTap = 0;
+  curveCanvas.addEventListener('pointerdown', function (ev) {
+    if (sel === null) return; ev.preventDefault();
+    var p = curvePos(ev), pts = curPoints(), hit = -1;
+    pts.forEach(function (pt, q) { if (Math.abs(pt[0] - p.x) < 12 && Math.abs(pt[1] - p.y) < 12 && hit === -1) hit = q; });
+    var now = Date.now();
+    if (hit !== -1 && now - curveLastTap < 350 && hit !== 0 && hit !== pts.length - 1) { pts.splice(hit, 1); curveLastTap = 0; curveChanged(true); return; }
+    curveLastTap = now;
+    if (hit === -1) { pts.push([Math.round(p.x), Math.round(p.y)]); pts.sort(function (a, b) { return a[0] - b[0]; }); hit = pts.findIndex(function (pt) { return pt[0] === Math.round(p.x) && pt[1] === Math.round(p.y); }); }
+    curveDrag = hit; curveCanvas.setPointerCapture(ev.pointerId); curveChanged(false);
+  });
+  curveCanvas.addEventListener('pointermove', function (ev) {
+    if (curveDrag === null) return;
+    var p = curvePos(ev), pts = curPoints(), q = curveDrag;
+    var lo = q > 0 ? pts[q - 1][0] + 1 : 0, hi = q < pts.length - 1 ? pts[q + 1][0] - 1 : 255;
+    if (q === 0) p.x = 0; else if (q === pts.length - 1) p.x = 255;
+    pts[q] = [Math.round(Math.max(lo, Math.min(hi, p.x))), Math.round(p.y)];
+    curveChanged(false);
+  });
+  function curveUp(ev) { if (curveDrag === null) return; curveDrag = null; try { curveCanvas.releasePointerCapture(ev.pointerId); } catch (e) {} curveChanged(true); }
+  curveCanvas.addEventListener('pointerup', curveUp); curveCanvas.addEventListener('pointercancel', curveUp);
 
   // ── Text layers ──
   var txText = document.getElementById('tx-text'), txFontSel = document.getElementById('tx-font'), txSize = document.getElementById('tx-size'), txSizeVal = document.getElementById('tx-size-val');
@@ -2321,6 +2493,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     else tc.drawImage(im, 0, 0, w, h);
     tc.restore();
     var cm = colorMatrix(e); if (!cm.identity) applyMatrixPixels(tc, w, h, cm);
+    var luts = curveLuts(e.cv); if (luts) applyLutPixels(tc, w, h, luts);
     if (e.sh > 0) applySharpen(tc, w, h, e.sh);
     if (e.vg > 0) {
       var v = vigStops(e.vg);
@@ -2335,7 +2508,9 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       tc.save(); tc.lineWidth = bw; tc.strokeStyle = e.bc || '#fff';
       tc.beginPath(); tc.moveTo(hx + r2, hx); tc.arcTo(w - hx, hx, w - hx, h - hx, r2); tc.arcTo(w - hx, h - hx, hx, h - hx, r2); tc.arcTo(hx, h - hx, hx, hx, r2); tc.arcTo(hx, hx, w - hx, hx, r2); tc.closePath(); tc.stroke(); tc.restore();
     }
+    applyFadeCanvas(tc, w, h, e);
     mainCtx.save(); mainCtx.globalAlpha = e.op / 100;
+    if (e.bm && e.bm !== 'normal') mainCtx.globalCompositeOperation = e.bm;
     if (e.sd > 0) { mainCtx.shadowColor = 'rgba(0,0,0,' + (0.35 + e.sd / 100 * 0.4).toFixed(2) + ')'; mainCtx.shadowBlur = e.sd * 0.3 * k; mainCtx.shadowOffsetY = e.sd * 0.15 * k; }
     mainCtx.drawImage(tmp, x, y); mainCtx.restore();
   }
