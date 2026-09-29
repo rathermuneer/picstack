@@ -63,6 +63,22 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 .img-count { font-size: 12px; color: var(--text-dim); margin-top: 8px; letter-spacing: 0.06em; }
 .img-count em { font-style: normal; color: var(--accent); }
 .img-total-size { font-size: 11px; color: var(--text-dim); margin-top: 3px; letter-spacing: 0.06em; }
+#layers { margin-top: 10px; max-height: 240px; overflow-y: auto; border: 1px solid var(--border); border-radius: 3px; display: none; }
+#layers.has { display: block; }
+.layer { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; touch-action: none; }
+.layer:last-child { border-bottom: none; }
+.layer:hover { background: var(--accent-dim); }
+.layer.selected { background: var(--accent-dim); box-shadow: inset 2px 0 0 var(--accent); }
+.layer.hid .layer-name, .layer.hid .layer-thumb { opacity: 0.35; }
+.layer.drag-over-before { box-shadow: inset 0 2px 0 var(--accent); }
+.layer.drag-over-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.layer-thumb { width: 34px; height: 26px; object-fit: cover; border-radius: 2px; background: var(--surface-2); flex-shrink: 0; }
+.layer-name { flex: 1; min-width: 0; font-size: 11px; color: var(--text-muted); letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.layer-eye { width: 28px; height: 28px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; border-radius: 3px; flex-shrink: 0; }
+.layer-eye:hover { color: var(--accent); background: var(--surface-2); }
+.layer-eye:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cell.filled.hidden { display: none; }
+.snap-line { position: absolute; background: var(--accent); pointer-events: none; z-index: 40; }
 
 .ctrl-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px; }
 .ctrl-label { font-size: 12px; color: var(--text-muted); letter-spacing: 0.06em; }
@@ -386,6 +402,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       <button class="add-btn" id="camera-btn" style="margin-top:6px;display:none"><span aria-hidden="true">📷</span> Take photo</button>
       <div class="img-count" id="img-count" aria-live="polite">0 images</div>
       <div class="img-total-size" id="img-total-size" aria-live="polite"></div>
+      <div id="layers" role="listbox" aria-label="Layers" aria-multiselectable="true"></div>
     </div>
 
     <div class="section" role="group" aria-labelledby="lbl-layout">
@@ -831,7 +848,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   function saveImages() {
     var payload = imgs.map(function (im) {
       return { id: im.id, dataUrl: im.dataUrl, name: im.name, w: im.w, h: im.h, size: im.size, enhance: im.enhance,
-               cut: im.cut || null, cutoutDataUrl: im.cutoutDataUrl || null, sc: im.sc, ox: im.ox };
+               cut: im.cut || null, cutoutDataUrl: im.cutoutDataUrl || null, sc: im.sc, ox: im.ox, hid: !!im.hid };
     });
     dbPut('imgs', payload);
     saveDot.className = 'save-dot saved';
@@ -1339,11 +1356,70 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     imgs.forEach(function (_, i) { frag.appendChild(makeFilledCell(i)); });
     if (imgs.length > 0) frag.appendChild(makeEmptyCell(imgs.length));
     stackEl.innerHTML = ''; stackEl.appendChild(frag);
+    renderLayers();
+  }
+
+  // ── Layer panel: thumbnails, names, visibility, drag to reorder ──
+  var layersEl = document.getElementById('layers');
+  function renderLayers() {
+    layersEl.classList.toggle('has', imgs.length > 0);
+    var frag = document.createDocumentFragment();
+    imgs.forEach(function (im, i) {
+      var row = document.createElement('div');
+      row.className = 'layer' + (isSel(i) ? ' selected' : '') + (im.hid ? ' hid' : '');
+      row.setAttribute('role', 'option'); row.setAttribute('aria-selected', isSel(i) ? 'true' : 'false'); row.tabIndex = 0; row.dataset.idx = i;
+      var th = document.createElement('img'); th.className = 'layer-thumb'; th.src = im.dataUrl; th.alt = ''; th.draggable = false;
+      var nm = document.createElement('span'); nm.className = 'layer-name'; nm.textContent = String(i + 1).padStart(2, '0') + '  ' + (im.name || 'Image ' + (i + 1));
+      var eye = document.createElement('button'); eye.className = 'layer-eye'; eye.textContent = im.hid ? '◌' : '◉';
+      eye.title = im.hid ? 'Show' : 'Hide'; eye.setAttribute('aria-label', (im.hid ? 'Show ' : 'Hide ') + (im.name || 'image ' + (i + 1)));
+      eye.addEventListener('click', function (e) { e.stopPropagation(); toggleHidden(targetsFor(i).indexOf(i) !== -1 && isSel(i) ? selIdx() : [i], !im.hid); });
+      row.appendChild(th); row.appendChild(nm); row.appendChild(eye);
+      row.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSelect(i, e); } });
+      attachLayerDrag(row, i);
+      frag.appendChild(row);
+    });
+    layersEl.innerHTML = ''; layersEl.appendChild(frag);
+    var cur = layersEl.querySelector('.layer.selected'); if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest' });
+  }
+  // pointer-based row drag: click selects, moving past a few px reorders (works with touch too)
+  function attachLayerDrag(row, i) {
+    var pid = null, sx, sy, moved = false, over = null, before = true;
+    function clearMarks() { layersEl.querySelectorAll('.layer').forEach(function (l) { l.classList.remove('drag-over-before', 'drag-over-after'); }); }
+    function onMove(e) {
+      if (e.pointerId !== pid) return;
+      if (!moved && Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) < 4) return;
+      moved = true; e.preventDefault();
+      var el = document.elementFromPoint(e.clientX, e.clientY), target = el && el.closest ? el.closest('.layer') : null;
+      clearMarks(); over = null;
+      if (target && target !== row) { var r = target.getBoundingClientRect(); before = e.clientY < r.top + r.height / 2; over = target; target.classList.add(before ? 'drag-over-before' : 'drag-over-after'); }
+    }
+    function onUp(e) {
+      if (e.pointerId !== pid) return;
+      window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onUp);
+      clearMarks(); pid = null;
+      if (!moved) { toggleSelect(i, e); return; }
+      if (over) {
+        var ti = parseInt(over.dataset.idx, 10), group = targetsFor(i), insertAt = 0;
+        for (var q = 0; q < (before ? ti : ti + 1); q++) if (group.indexOf(q) === -1) insertAt++;
+        moveGroup(group, insertAt, 'Move');
+      }
+    }
+    row.addEventListener('pointerdown', function (e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      if (e.target.closest('.layer-eye')) return;
+      pid = e.pointerId; sx = e.clientX; sy = e.clientY; moved = false; over = null;
+      window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp); window.addEventListener('pointercancel', onUp);
+    });
+  }
+  function toggleHidden(list, hide) {
+    list.forEach(function (k) { imgs[k].hid = hide; });
+    render(); commit(hide ? 'Hide' : 'Show');
+    showToast(hide ? (list.length > 1 ? list.length + ' images hidden' : 'Image hidden') : (list.length > 1 ? list.length + ' images shown' : 'Image shown'));
   }
 
   function makeFilledCell(i) {
     var cell = document.createElement('div');
-    cell.className = 'cell filled' + (isSel(i) ? ' selected' : '') + (sel === i ? ' primary' : '');
+    cell.className = 'cell filled' + (isSel(i) ? ' selected' : '') + (sel === i ? ' primary' : '') + (imgs[i].hid ? ' hidden' : '');
     cell.dataset.idx = i; cell.setAttribute('role', 'listitem');
     var imgEl = document.createElement('img');
     imgEl.src = imgs[i].dataUrl; imgEl.alt = imgs[i].name || ('Image ' + (i + 1));
@@ -1442,7 +1518,9 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
         var r = cell.getBoundingClientRect(), asp = r.height / Math.max(1, r.width);
         var isLeft = h.classList.contains('nw') || h.classList.contains('sw');
         var isTop  = h.classList.contains('nw') || h.classList.contains('ne');
-        var label = cell.querySelector('.rs-label');
+        var label = cell.querySelector('.rs-label'), snapTo = null, guide = document.createElement('div');
+        guide.className = 'snap-line'; guide.style.display = 'none'; stackEl.appendChild(guide);
+        var others = []; imgs.forEach(function (o, q) { if (!o.hid && targetsFor(i).indexOf(q) === -1) others.push({ i: q, sc: sizeOf(o).sc }); });
         cell.classList.add('resizing');
         function mv(ev) {
           var dx = ev.clientX - sx, dy = ev.clientY - sy, dMain, dCross;
@@ -1452,6 +1530,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
           var sc = (sc0 * base + d) / base;
           if (sc > 0.97) sc = 1;                       // snap to full size
           else [1/2, 1/3, 2/3, 1/4, 3/4].forEach(function (f) { if (Math.abs(sc - f) < 0.015) sc = f; }); // snap to grid fractions
+          snapTo = null; others.forEach(function (o) { if (snapTo === null && Math.abs(sc - o.sc) < 0.012 && o.sc < 1) { sc = o.sc; snapTo = o.i; } }); // match another image's size
           sc = Math.min(1, Math.max(0.08, sc));
           var anchorFar = horiz ? isTop : isLeft;       // handle on the start side: keep the far edge fixed
           var ox = anchorFar ? ox0 + sc0 - sc : ox0;
@@ -1459,11 +1538,17 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
           ox = Math.min(1 - sc, Math.max(0, ox));
           im.sc = sc; im.ox = ox; applySize(cell, im);
           var px = fracPx(sc, stackW, gap, true);
-          label.textContent = Math.round(sc * 100) + '%  ·  ' + (horiz ? px + ' px tall' : px + ' px wide');
+          label.textContent = Math.round(sc * 100) + '%  ·  ' + (horiz ? px + ' px tall' : px + ' px wide') + (snapTo !== null ? '  ·  = ' + String(snapTo + 1).padStart(2, '0') : '');
+          // guide line along the edge being dragged, spanning the stack, when the size matches another image
+          if (snapTo !== null) {
+            guide.style.display = 'block';
+            if (!horiz) { guide.style.top = 0; guide.style.bottom = 0; guide.style.width = '1px'; guide.style.height = ''; guide.style.left = (isLeft ? cell.offsetLeft : cell.offsetLeft + cell.offsetWidth) + 'px'; }
+            else { guide.style.left = 0; guide.style.right = 0; guide.style.height = '1px'; guide.style.width = ''; guide.style.top = (isTop ? cell.offsetTop : cell.offsetTop + cell.offsetHeight) + 'px'; }
+          } else guide.style.display = 'none';
         }
         function up(ev) {
           window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
-          cell.classList.remove('resizing');
+          cell.classList.remove('resizing'); if (guide.parentNode) guide.parentNode.removeChild(guide);
           setSize(i, im.sc, im.ox);
           // resizing one selected image resizes the whole selection to the same fraction
           targetsFor(i).forEach(function (k) { if (k !== i) setSize(k, im.sc, sizeOf(imgs[k]).ox); });
@@ -2087,6 +2172,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     if (!imgs.length) { done(expCanvas); return; }
     var loaded = new Array(imgs.length), pending = imgs.length;
     imgs.forEach(function (imgData, idx) {
+      if (imgData.hid) { loaded[idx] = null; pending--; if (!pending) drawStack(loaded, done); return; }
       var im = new Image();
       im.onload  = function () { loaded[idx] = im;   pending--; if (!pending) drawStack(loaded, done); };
       im.onerror = function () { loaded[idx] = null; pending--; if (!pending) drawStack(loaded, done); };
@@ -2111,28 +2197,29 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     var dim = getExportDim();
     // transparent bg only survives in PNG; fall back to white for JPEG
     var effBg = bg === 'transparent' ? (getMime() === 'image/png' ? null : '#ffffff') : bg;
+    // only loaded, visible images take part in the layout
+    var vis = []; loadedImgs.forEach(function (im, idx) { if (im && !imgs[idx].hid) vis.push(idx); });
+    if (!vis.length) { expCanvas.width = 1; expCanvas.height = 1; done(expCanvas); return; }
+    var ctx;
     if (stackDir === 'h') {
-      var exportH = dim;
-      var gh0 = gap * exportRes;
-      var hs = loadedImgs.map(function (im, idx) { return fracPx(sizeOf(imgs[idx]).sc, exportH, gh0, true); });
-      var widths = loadedImgs.map(function (im, idx) { return im ? Math.round(hs[idx] * im.naturalWidth / im.naturalHeight) : Math.round(hs[idx] * 0.75); });
-      var gh = gap * exportRes;
-      var totalW = widths.reduce(function (s, w) { return s + w; }, 0) + gh * Math.max(0, loadedImgs.length - 1);
+      var exportH = dim, gh = gap * exportRes;
+      var hs = vis.map(function (idx) { return fracPx(sizeOf(imgs[idx]).sc, exportH, gh, true); });
+      var widths = vis.map(function (idx, q) { var im = loadedImgs[idx]; return Math.round(hs[q] * im.naturalWidth / im.naturalHeight); });
+      var totalW = widths.reduce(function (s, w) { return s + w; }, 0) + gh * Math.max(0, vis.length - 1);
       expCanvas.width = totalW; expCanvas.height = exportH;
-      var ctx = expCanvas.getContext('2d');
+      ctx = expCanvas.getContext('2d');
       if (effBg) { ctx.fillStyle = effBg; ctx.fillRect(0, 0, totalW, exportH); }
       var x = 0;
-      loadedImgs.forEach(function (im, idx) { var w = widths[idx]; if (im) drawWithEnhance(ctx, im, imgs[idx], x, fracPx(sizeOf(imgs[idx]).ox, exportH, gh, false), w, hs[idx]); x += w + gh; });
+      vis.forEach(function (idx, q) { drawWithEnhance(ctx, loadedImgs[idx], imgs[idx], x, fracPx(sizeOf(imgs[idx]).ox, exportH, gh, false), widths[q], hs[q]); x += widths[q] + gh; });
     } else {
       var exportW = dim, g = gap * exportRes;
-      var ws = loadedImgs.map(function (im, idx) { return fracPx(sizeOf(imgs[idx]).sc, exportW, g, true); });
-      var heights = loadedImgs.map(function (im, idx) { return im ? Math.round(ws[idx] * im.naturalHeight / im.naturalWidth) : Math.round(ws[idx] * 0.75); });
-      var pos = flowLayout(exportW, g, loadedImgs.map(function (_, idx) { return { w: ws[idx], h: heights[idx], ox: fracPx(sizeOf(imgs[idx]).ox, exportW, g, false) }; }));
-      var totalH = pos.height;
-      expCanvas.width = exportW; expCanvas.height = totalH;
-      var ctx = expCanvas.getContext('2d');
-      if (effBg) { ctx.fillStyle = effBg; ctx.fillRect(0, 0, exportW, totalH); }
-      loadedImgs.forEach(function (im, idx) { if (im) drawWithEnhance(ctx, im, imgs[idx], pos.items[idx].x, pos.items[idx].y, ws[idx], heights[idx]); });
+      var ws = vis.map(function (idx) { return fracPx(sizeOf(imgs[idx]).sc, exportW, g, true); });
+      var heights = vis.map(function (idx, q) { var im = loadedImgs[idx]; return Math.round(ws[q] * im.naturalHeight / im.naturalWidth); });
+      var pos = flowLayout(exportW, g, vis.map(function (idx, q) { return { w: ws[q], h: heights[q], ox: fracPx(sizeOf(imgs[idx]).ox, exportW, g, false) }; }));
+      expCanvas.width = exportW; expCanvas.height = pos.height;
+      ctx = expCanvas.getContext('2d');
+      if (effBg) { ctx.fillStyle = effBg; ctx.fillRect(0, 0, exportW, pos.height); }
+      vis.forEach(function (idx, q) { drawWithEnhance(ctx, loadedImgs[idx], imgs[idx], pos.items[q].x, pos.items[q].y, ws[q], heights[q]); });
     }
     done(expCanvas);
   }
@@ -2227,6 +2314,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     var dim = getExportDim();
     var loaded = new Array(imgs.length), pending = imgs.length;
     imgs.forEach(function (imgData, idx) {
+      if (imgData.hid) { loaded[idx] = null; pending--; if (!pending) buildPdfPages(loaded, dim); return; }
       var im = new Image();
       im.onload  = function () { loaded[idx] = im;   pending--; if (!pending) buildPdfPages(loaded, dim); };
       im.onerror = function () { loaded[idx] = null; pending--; if (!pending) buildPdfPages(loaded, dim); };
