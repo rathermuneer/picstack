@@ -271,6 +271,15 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 #ctx-menu button.danger:hover { color: #ff6b6b; }
 #stack.reordering .cell.filled:not(.lifting) { transition: transform 0.12s; }
 .cell.filled.selected { box-shadow: inset 0 0 0 2px var(--accent); }
+.cell.filled.selected:not(.primary) { box-shadow: inset 0 0 0 2px var(--accent); opacity: 0.96; }
+.cell.filled.selected:not(.primary)::after { content: ''; position: absolute; inset: 0; background: var(--accent); opacity: 0.12; pointer-events: none; }
+#hist-bar { position: fixed; top: 12px; right: 14px; z-index: 60; display: flex; gap: 4px; }
+#hist-bar button { width: 36px; height: 36px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 3px;
+  color: var(--text-muted); font-family: inherit; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+#hist-bar button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+#hist-bar button:disabled { opacity: 0.3; cursor: default; }
+#hist-bar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sel-count { font-size: 11px; color: var(--accent); letter-spacing: 0.08em; margin-bottom: 8px; }
 .cell-toolbar { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center;
   justify-content: space-between; padding: 6px 8px;
   background: linear-gradient(to bottom, rgba(13,13,22,0.75) 0%, transparent 100%);
@@ -330,6 +339,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   #sidebar-overlay.open { display: block; }
 
   #workspace { padding: 20px 16px 60px; }
+  #hist-bar { top: auto; bottom: 22px; left: 18px; right: auto; }
   #workspace.drag-active::after { left: 0; }
 
   #sidebar-fab {
@@ -478,7 +488,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
         <div class="img-action-btns">
           <button class="img-action-btn" id="img-dup" aria-label="Duplicate image" title="Duplicate this image (Cmd/Ctrl+D)">⧉ Dup</button>
           <button class="img-action-btn" id="img-crop" aria-label="Crop image">⬚ Crop</button>
-          <button class="img-action-btn" id="img-undo" disabled aria-label="Undo last change">↩ Undo</button>
+          <button class="img-action-btn" id="img-undo" disabled aria-label="Undo">↩ Undo</button>
+          <button class="img-action-btn" id="img-redo" disabled aria-label="Redo">↪ Redo</button>
         </div>
         <button class="reset-link" id="img-reset">Reset to original</button>
       </div>
@@ -543,7 +554,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     <div id="empty-msg" aria-live="polite">
       <div class="empty-icon" aria-hidden="true">⬡</div>
       <div class="empty-head">Drop images anywhere to start</div>
-      <div class="empty-body">or click Add images<br>drag an image to move it · click to select</div>
+      <div class="empty-body">or click Add images<br>drag to move · click to select · ⇧/⌘-click for several</div>
       <div class="privacy-note"><span>🔒 Your images never leave your device — no uploads, no account, free forever</span></div>
     </div>
   </main>
@@ -579,6 +590,10 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 <canvas id="exp-canvas" style="display:none" aria-hidden="true"></canvas>
 <input type="file" id="file-input" accept="image/*,.heic,.heif" multiple style="display:none" aria-hidden="true">
 <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none" aria-hidden="true">
+<div id="hist-bar" role="group" aria-label="History">
+  <button id="hist-undo" title="Undo (⌘Z)" aria-label="Undo" disabled>↩</button>
+  <button id="hist-redo" title="Redo (⇧⌘Z)" aria-label="Redo" disabled>↪</button>
+</div>
 <div id="toast" role="status" aria-live="polite"></div>
 <div id="ctx-menu" role="menu" aria-label="Image actions">
   <button role="menuitem" data-act="dup">Duplicate <kbd>⌘D · ⌥drag</kbd></button>
@@ -622,7 +637,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 (function () {
   // ── State ──
   var imgs    = [];
-  var sel     = null;
+  var sel     = null;      // primary selected index (drives the panel)
+  var selIds  = [];        // ids of every selected image
   var gap     = 8, bg = '#ffffff', stackW = 700, stackDir = 'v';
   var exportRes = 2, exportFmt = 'jpeg', pdfMode = 'combined';
   var dragSrc = null, toastT = null;
@@ -750,6 +766,36 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
   function saveState() { saveSettings(); saveImages(); }
 
+  // ── Global history: every image mutation commits a shallow snapshot (pixel data is shared by reference) ──
+  var hist = [], hp = -1, HIST_MAX = 60;
+  function cloneRec(im) {
+    var c = Object.assign({}, im);
+    c.enhance = JSON.parse(JSON.stringify(im.enhance || defaultEnhance()));
+    c.cut = im.cut ? JSON.parse(JSON.stringify(im.cut)) : null;
+    delete c.undoStack; return c;
+  }
+  function snapState(label) { return { label: label || '', imgs: imgs.map(cloneRec), sel: sel, selIds: selIds.slice() }; }
+  function commit(label) {
+    hist = hist.slice(0, hp + 1); hist.push(snapState(label));
+    if (hist.length > HIST_MAX) hist.shift();
+    hp = hist.length - 1; saveState(); syncHistBtns();
+  }
+  function restore(st) {
+    // keep the user's current selection where those images still exist, rather than jumping to the snapshot's
+    var primaryId = sel !== null && imgs[sel] ? imgs[sel].id : null;
+    imgs = st.imgs.map(cloneRec);
+    selIds = selIds.filter(function (id) { return idxOfId(id) !== -1; });
+    sel = primaryId !== null && idxOfId(primaryId) !== -1 && selIds.indexOf(primaryId) !== -1 ? idxOfId(primaryId) : (selIds.length ? idxOfId(selIds[0]) : null);
+    render(); syncCount(); syncTotalSize(); syncButtons(); saveState(); syncHistBtns();
+    if (sel !== null) showPanel(sel); else hidePanel();
+  }
+  function undo() { if (hp <= 0) return; var was = hist[hp].label; hp--; restore(hist[hp]); showToast('Undo' + (was ? ' — ' + was : '')); announce('Undo ' + was); }
+  function redo() { if (hp >= hist.length - 1) return; hp++; restore(hist[hp]); showToast('Redo' + (hist[hp].label ? ' — ' + hist[hp].label : '')); announce('Redo ' + hist[hp].label); }
+  function syncHistBtns() {
+    ['hist-undo', 'img-undo'].forEach(function (id) { var b = document.getElementById(id); if (b) b.disabled = hp <= 0; });
+    ['hist-redo', 'img-redo'].forEach(function (id) { var b = document.getElementById(id); if (b) b.disabled = hp >= hist.length - 1; });
+  }
+
   function loadSettings() {
     try {
       var s = JSON.parse(localStorage.getItem('cm-settings') || 'null');
@@ -866,7 +912,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
               loaded.push({ id: uid(), dataUrl: url, origDataUrl: url, name: f.name, w: dimImg.width, h: dimImg.height, size: calcSize(url), enhance: defaultEnhance(), undoStack: [] });
               pending--;
               if (!pending) {
-                imgs = imgs.concat(loaded); render(); syncCount(); syncTotalSize(); syncButtons(); saveState();
+                imgs = imgs.concat(loaded); render(); syncCount(); syncTotalSize(); syncButtons(); commit('Add ' + loaded.length + (loaded.length > 1 ? ' images' : ' image'));
                 showToast(loaded.length + ' image' + (loaded.length > 1 ? 's' : '') + ' added');
               }
             };
@@ -874,7 +920,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
               pending--;
               showToast(f.name + ' — format not supported. Try converting to JPG first.');
               if (!pending && loaded.length) {
-                imgs = imgs.concat(loaded); render(); syncCount(); syncTotalSize(); syncButtons(); saveState();
+                imgs = imgs.concat(loaded); render(); syncCount(); syncTotalSize(); syncButtons(); commit('Add images');
               }
             };
             dimImg.src = url;
@@ -898,7 +944,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
             imgs[idx].dataUrl = url; imgs[idx].origDataUrl = url; imgs[idx].name = file.name;
             imgs[idx].w = dimImg.width; imgs[idx].h = dimImg.height; imgs[idx].size = calcSize(url);
             imgs[idx].undoStack = [];
-            render(); saveState(); showToast('Image replaced');
+            render(); commit('Replace image'); showToast('Image replaced');
           };
           dimImg.src = url;
         });
@@ -906,21 +952,6 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       ur.readAsDataURL(file);
     };
     ab.readAsArrayBuffer(file);
-  }
-
-  // ── Undo helpers ──
-  function pushUndo(idx) {
-    var im = imgs[idx];
-    if (!im.undoStack) im.undoStack = [];
-    im.undoStack.push({ dataUrl: im.dataUrl,
-                        cut: im.cut ? JSON.parse(JSON.stringify(im.cut)) : null,
-                        cutoutDataUrl: im.cutoutDataUrl || null });
-    if (sel === idx) syncUndoBtn();
-  }
-  function syncUndoBtn() {
-    var btn = document.getElementById('img-undo');
-    if (!btn) return;
-    btn.disabled = !(sel !== null && imgs[sel] && imgs[sel].undoStack && imgs[sel].undoStack.length > 0);
   }
 
   // ── Rotate ──
@@ -939,12 +970,11 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     im.src = url;
   }
 
-  function rotateImage(idx, deg) {
-    pushUndo(idx);
+  function rotateImage(idx, deg, done) {
     var im = imgs[idx];
     rotateUrl(im.dataUrl, deg, isTransparentCut(im), function (url, w, h) {
       im.dataUrl = url; im.w = w; im.h = h; im.size = calcSize(url);
-      function finish() { render(); saveState(); syncTotalSize(); if (sel === idx) selectImg(idx); }
+      function finish() { if (done) { done(); return; } render(); syncTotalSize(); commit('Rotate'); if (sel !== null) showPanel(sel); }
       if (im.cut && im.cutoutDataUrl) {
         rotateUrl(im.cutoutDataUrl, deg, true, function (u2) {
           im.cutoutDataUrl = u2;
@@ -967,12 +997,11 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     im.src = url;
   }
 
-  function flipImage(idx, axis) {
-    pushUndo(idx);
+  function flipImage(idx, axis, done) {
     var im = imgs[idx];
     flipUrl(im.dataUrl, axis, isTransparentCut(im), function (url, w, h) {
       im.dataUrl = url; im.w = w; im.h = h; im.size = calcSize(url);
-      function finish() { render(); saveState(); syncTotalSize(); if (sel === idx) selectImg(idx); showToast(axis === 'h' ? 'Flipped horizontally' : 'Flipped vertically'); }
+      function finish() { if (done) { done(); return; } render(); syncTotalSize(); commit('Flip'); if (sel !== null) showPanel(sel); showToast(axis === 'h' ? 'Flipped horizontally' : 'Flipped vertically'); }
       if (im.cut && im.cutoutDataUrl) {
         flipUrl(im.cutoutDataUrl, axis, true, function (u2) {
           im.cutoutDataUrl = u2;
@@ -1080,16 +1109,43 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     if (el) { el.textContent = ''; setTimeout(function () { el.textContent = msg; }, 50); }
   }
 
-  function selectImg(i) {
-    sel = i; render();
-    announce('Image ' + (i + 1) + ' selected: ' + (imgs[i].name || 'untitled'));
+  function idxOfId(id) { for (var k = 0; k < imgs.length; k++) if (imgs[k].id === id) return k; return -1; }
+  function isSel(i) { return !!imgs[i] && selIds.indexOf(imgs[i].id) !== -1; }
+  function selIdx() { var out = []; imgs.forEach(function (im, k) { if (selIds.indexOf(im.id) !== -1) out.push(k); }); return out; }
+  // targets for an action started on image i: the whole selection if i is part of it, else just i
+  function targetsFor(i) { return (i === undefined || i === null) ? selIdx() : (isSel(i) ? selIdx() : [i]); }
+
+  // mode: undefined = single select, 'toggle' = add/remove (⌘-click), 'range' = extend from primary (⇧-click)
+  function selectImg(i, mode) {
+    if (mode === 'toggle') {
+      var id = imgs[i].id, at = selIds.indexOf(id);
+      if (at !== -1) { selIds.splice(at, 1); if (sel === i) sel = selIds.length ? idxOfId(selIds[selIds.length - 1]) : null; }
+      else { selIds.push(id); sel = i; }
+    } else if (mode === 'range' && sel !== null) {
+      var a = Math.min(sel, i), b = Math.max(sel, i);
+      for (var k = a; k <= b; k++) if (selIds.indexOf(imgs[k].id) === -1) selIds.push(imgs[k].id);
+    } else { selIds = [imgs[i].id]; sel = i; }
+    render();
+    if (sel === null) { hidePanel(); return; }
+    showPanel(sel);
+    announce(selIds.length > 1 ? selIds.length + ' images selected' : 'Image ' + (sel + 1) + ' selected: ' + (imgs[sel].name || 'untitled'));
+  }
+  function selectAll() {
+    if (!imgs.length) return;
+    selIds = imgs.map(function (im) { return im.id; }); if (sel === null) sel = 0;
+    render(); showPanel(sel); announce('All ' + imgs.length + ' images selected');
+  }
+  function hidePanel() { imgPlaceholder.style.display = 'block'; imgControls.style.display = 'none'; }
+
+  function showPanel(i) {
     var e = imgs[i].enhance;
     imgPlaceholder.style.display = 'none'; imgControls.style.display = 'block';
     var name = imgs[i].name || ('Image ' + (i + 1));
-    imgPanelName.textContent = name.length > 24 ? name.slice(0,22) + '…' : name;
+    imgPanelName.textContent = selIds.length > 1 ? selIds.length + ' images selected' : (name.length > 24 ? name.slice(0,22) + '…' : name);
     function showMeta() {
       var d = imgs[i];
-      imgMeta.textContent = d.w && d.h ? d.w + ' × ' + d.h + (d.size ? ' · ' + fmtSize(d.size) : '') : (d.size ? fmtSize(d.size) : '');
+      imgMeta.textContent = selIds.length > 1 ? 'Adjustments apply to all selected' :
+        (d.w && d.h ? d.w + ' × ' + d.h + (d.size ? ' · ' + fmtSize(d.size) : '') : (d.size ? fmtSize(d.size) : ''));
     }
     if (imgs[i].w) { showMeta(); } else {
       imgMeta.textContent = '…';
@@ -1108,12 +1164,10 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       var fill = cut.fill || 'transparent';
       document.querySelectorAll('#fill-swatches .swatch').forEach(function (s) { s.classList.toggle('on', s.dataset.fill === fill); });
     }
-    syncUndoBtn();
+    syncHistBtns();
   }
 
-  function deselect() {
-    sel = null; imgPlaceholder.style.display = 'block'; imgControls.style.display = 'none'; render();
-  }
+  function deselect() { sel = null; selIds = []; hidePanel(); render(); }
 
   // ── Render ──
   function render() {
@@ -1129,7 +1183,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
   function makeFilledCell(i) {
     var cell = document.createElement('div');
-    cell.className = 'cell filled' + (sel === i ? ' selected' : '');
+    cell.className = 'cell filled' + (isSel(i) ? ' selected' : '') + (sel === i ? ' primary' : '');
     cell.dataset.idx = i; cell.setAttribute('role', 'listitem');
     var imgEl = document.createElement('img');
     imgEl.src = imgs[i].dataUrl; imgEl.alt = imgs[i].name || ('Image ' + (i + 1));
@@ -1140,8 +1194,12 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     ['nw','ne','sw','se'].forEach(function (k) { var h = document.createElement('div'); h.className = 'rs-h ' + k; h.setAttribute('aria-hidden','true'); h.title = 'Drag to resize'; cell.appendChild(h); });
     var rsLabel = document.createElement('div'); rsLabel.className = 'rs-label'; cell.appendChild(rsLabel);
     attachResize(cell, i);
-    cell.addEventListener('contextmenu', function (e) { e.preventDefault(); if (sel !== i) selectImg(i); openCtxMenu(e.clientX, e.clientY, i); });
-    cell.addEventListener('dblclick', function (e) { if (e.target.closest('.cell-rm')) return; setSize(i, 1, 0); if (sel !== i) selectImg(i); showToast('Fit to width'); });
+    cell.addEventListener('contextmenu', function (e) {
+      e.preventDefault();
+      if (!isSel(i)) selectImg(i); else if (sel !== i) { sel = i; render(); showPanel(i); }
+      openCtxMenu(e.clientX, e.clientY, i);
+    });
+    cell.addEventListener('dblclick', function (e) { if (e.target.closest('.cell-rm')) return; targetsFor(i).forEach(function (k) { setSize(k, 1, 0); }); commit('Fit to width'); if (!isSel(i)) selectImg(i); showToast('Fit to width'); });
     var tb = document.createElement('div'); tb.className = 'cell-toolbar';
     var left = document.createElement('div'); left.style.cssText = 'display:flex;align-items:center;gap:6px';
     var num = document.createElement('span'); num.className = 'cell-num'; num.setAttribute('aria-hidden','true');
@@ -1149,17 +1207,13 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     left.appendChild(num); tb.appendChild(left);
     var rm = document.createElement('button'); rm.className = 'cell-rm'; rm.innerHTML = '&times;';
     rm.setAttribute('aria-label', 'Remove image ' + (i+1));
-    rm.addEventListener('click', function (e) {
-      e.stopPropagation(); imgs.splice(i, 1);
-      if (sel === i) deselect(); else if (sel > i) sel--;
-      render(); syncCount(); syncTotalSize(); syncButtons(); saveState(); showToast('Image removed');
-    });
+    rm.addEventListener('click', function (e) { e.stopPropagation(); removeImages(targetsFor(i)); });
     tb.appendChild(rm); cell.appendChild(tb);
     cell.tabIndex = 0;
     cell.setAttribute('aria-label', 'Image ' + (i + 1) + ': ' + (imgs[i].name || 'untitled') + '. Press Enter to select.');
     cell.setAttribute('title', 'Drag to move · click to select');
     cell.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSelect(i); return; }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSelect(i, e); return; }
       // keyboard reorder: Alt+Arrow moves the image up/down (or left/right) the stack
       var back = e.key === 'ArrowUp' || e.key === 'ArrowLeft', fwd = e.key === 'ArrowDown' || e.key === 'ArrowRight';
       if (e.altKey && (back || fwd)) {
@@ -1172,7 +1226,37 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     addDropListeners(cell, i, true); return cell;
   }
 
-  function toggleSelect(i) { if (sel === i) deselect(); else selectImg(i); }
+  function toggleSelect(i, e) {
+    if (e && e.shiftKey) selectImg(i, 'range');
+    else if (e && (e.metaKey || e.ctrlKey)) selectImg(i, 'toggle');
+    else if (isSel(i) && selIds.length === 1) deselect();
+    else selectImg(i);
+  }
+
+  function removeImages(list) {
+    if (!list.length) return;
+    var ids = list.map(function (k) { return imgs[k].id; });
+    imgs = imgs.filter(function (im) { return ids.indexOf(im.id) === -1; });
+    selIds = selIds.filter(function (id) { return ids.indexOf(id) === -1; });
+    sel = selIds.length ? idxOfId(selIds[0]) : null;
+    render(); syncCount(); syncTotalSize(); syncButtons();
+    commit(list.length > 1 ? 'Remove ' + list.length + ' images' : 'Remove image');
+    if (sel !== null) showPanel(sel); else hidePanel();
+    showToast(list.length > 1 ? list.length + ' images removed' : 'Image removed');
+  }
+
+  // move a set of images so they sit together at position insertAt among the remaining images
+  function moveGroup(idxs, insertAt, label) {
+    var primaryId = sel !== null ? imgs[sel].id : null;
+    var moving = idxs.map(function (k) { return imgs[k]; });
+    var rest = imgs.filter(function (_, k) { return idxs.indexOf(k) === -1; });
+    insertAt = Math.max(0, Math.min(rest.length, insertAt));
+    var next = rest.slice(0, insertAt).concat(moving, rest.slice(insertAt));
+    var changed = next.some(function (im, k) { return im !== imgs[k]; });
+    imgs = next; if (primaryId !== null) sel = idxOfId(primaryId);
+    render(); if (changed) commit(label || 'Move');
+    return changed;
+  }
 
   // ── Per-image size: sc = fraction of the stack width (height in H mode), ox = offset from the start edge ──
   function sizeOf(im) { return { sc: (typeof im.sc === 'number' && im.sc > 0) ? im.sc : 1, ox: typeof im.ox === 'number' ? im.ox : 0 }; }
@@ -1192,7 +1276,6 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     sc = Math.min(1, Math.max(0.08, sc)); ox = Math.min(1 - sc, Math.max(0, ox));
     imgs[i].sc = sc; imgs[i].ox = ox;
     var c = stackEl.querySelector('.cell[data-idx="' + i + '"]'); if (c) applySize(c, imgs[i]);
-    saveState();
   }
   function attachResize(cell, i) {
     Array.prototype.forEach.call(cell.querySelectorAll('.rs-h'), function (h) {
@@ -1226,7 +1309,10 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
         function up(ev) {
           window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
           cell.classList.remove('resizing');
-          setSize(i, im.sc, im.ox); render(); if (sel === i) selectImg(i);
+          setSize(i, im.sc, im.ox);
+          // resizing one selected image resizes the whole selection to the same fraction
+          targetsFor(i).forEach(function (k) { if (k !== i) setSize(k, im.sc, sizeOf(imgs[k]).ox); });
+          render(); commit('Resize'); if (sel !== null) showPanel(sel);
         }
         window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
       });
@@ -1248,29 +1334,31 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   window.addEventListener('blur', closeCtxMenu);
   ctxMenu.addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b || ctxTarget === null) return;
-    var i = ctxTarget, act = b.dataset.act, z = sizeOf(imgs[i]); closeCtxMenu();
-    if (act === 'dup') duplicateImage(i);
-    else if (act === 'fliph') flipImage(i, 'h');
-    else if (act === 'flipv') flipImage(i, 'v');
-    else if (act === 'rotl') rotateImage(i, 270);
-    else if (act === 'rotr') rotateImage(i, 90);
-    else if (act === 'fit') setSize(i, 1, 0);
-    else if (act === 'left') setSize(i, z.sc, 0);
-    else if (act === 'center') setSize(i, z.sc, (1 - z.sc) / 2);
-    else if (act === 'right') setSize(i, z.sc, 1 - z.sc);
-    else if (act === 'top') moveImage(i, 0);
-    else if (act === 'bottom') moveImage(i, imgs.length - 1);
-    else if (act === 'rm') { imgs.splice(i, 1); if (sel === i) deselect(); else if (sel > i) sel--; render(); syncCount(); syncTotalSize(); syncButtons(); saveState(); showToast('Image removed'); }
+    var i = ctxTarget, act = b.dataset.act, t = targetsFor(i); closeCtxMenu();
+    if (act === 'dup') duplicateImages(t);
+    else if (act === 'fliph') flipAll(t, 'h');
+    else if (act === 'flipv') flipAll(t, 'v');
+    else if (act === 'rotl') rotateAll(t, 270);
+    else if (act === 'rotr') rotateAll(t, 90);
+    else if (act === 'fit' || act === 'left' || act === 'center' || act === 'right') {
+      t.forEach(function (k) { var z = sizeOf(imgs[k]);
+        if (act === 'fit') setSize(k, 1, 0); else if (act === 'left') setSize(k, z.sc, 0);
+        else if (act === 'center') setSize(k, z.sc, (1 - z.sc) / 2); else setSize(k, z.sc, 1 - z.sc); });
+      commit(act === 'fit' ? 'Fit to width' : 'Align');
+    }
+    else if (act === 'top') moveGroup(t, 0, 'Move to top');
+    else if (act === 'bottom') moveGroup(t, imgs.length, 'Move to bottom');
+    else if (act === 'rm') removeImages(t);
   });
 
   function moveImage(from, to) {
     if (from === to) return;
-    var moved = imgs.splice(from, 1)[0]; imgs.splice(to, 0, moved);
-    if (sel === from) sel = to;
-    else if (sel !== null) { if (from < sel && to >= sel) sel--; else if (from > sel && to <= sel) sel++; }
-    render(); saveState();
+    moveGroup([from], to, 'Move');
     announce('Image moved to position ' + (to + 1));
   }
+  // batch versions of the baked edits: one history entry for the whole selection
+  function rotateAll(t, deg) { var n = t.length; t.forEach(function (k) { rotateImage(k, deg, function () { if (--n === 0) { render(); syncTotalSize(); commit(t.length > 1 ? 'Rotate ' + t.length + ' images' : 'Rotate'); if (sel !== null) showPanel(sel); } }); }); }
+  function flipAll(t, axis) { var n = t.length; t.forEach(function (k) { flipImage(k, axis, function () { if (--n === 0) { render(); syncTotalSize(); commit(t.length > 1 ? 'Flip ' + t.length + ' images' : 'Flip'); if (sel !== null) showPanel(sel); showToast(axis === 'h' ? 'Flipped horizontally' : 'Flipped vertically'); } }); }); }
 
   // ── Direct drag: grab an image anywhere, it follows the pointer, and slides into a new slot as you pass others ──
   function attachPointerDrag(cell, i) {
@@ -1281,6 +1369,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     function lift() {
       lifted = true; cell.classList.add('lifting'); stackEl.classList.add('reordering');
       var r = cell.getBoundingClientRect(); baseL = r.left; baseT = r.top; tx = 0; ty = 0;
+      if (isSel(i) && selIds.length > 1) stackEl.querySelectorAll('.cell.selected').forEach(function (c) { if (c !== cell) c.classList.add('dragging'); });
       if (dup) {
         // Alt/Option-drag: leave a ghost of the original in place and drag off a copy
         ghost = cell.cloneNode(true); ghost.classList.remove('lifting', 'selected'); ghost.classList.add('dup-ghost');
@@ -1312,20 +1401,23 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       if (py < wr.top + edge) workspace.scrollTop -= 12;
       else if (py > wr.bottom - edge) workspace.scrollTop += 12;
     }
-    function finish(commit) {
+    function finish(doCommit) {
       if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
       cell.classList.remove('lifting'); stackEl.classList.remove('reordering'); cell.style.transform = '';
-      if (commit && lifted && dup) {
-        var copy = makeCopy(imgs[i]), out = [], selIdx = 0;
-        Array.prototype.forEach.call(stackEl.querySelectorAll('.cell.filled'), function (c, k) {
-          if (c === cell) { out.push(copy); selIdx = k; } else out.push(imgs[parseInt(c.dataset.idx, 10)]);
+      var group = targetsFor(i);
+      if (doCommit && lifted && dup) {
+        var copies = group.map(function (k) { return makeCopy(imgs[k]); }), out = [];
+        Array.prototype.forEach.call(stackEl.querySelectorAll('.cell.filled'), function (c) {
+          if (c === cell) copies.forEach(function (cp) { out.push(cp); });
+          else out.push(imgs[parseInt(c.dataset.idx, 10)]);
         });
-        imgs = out; sel = selIdx;
-        render(); syncCount(); syncTotalSize(); syncButtons(); saveState(); selectImg(selIdx); showToast('Duplicated');
-      } else if (commit && lifted) {
+        imgs = out; selIds = copies.map(function (cp) { return cp.id; }); sel = idxOfId(copies[0].id);
+        render(); syncCount(); syncTotalSize(); syncButtons(); commit(copies.length > 1 ? 'Duplicate ' + copies.length + ' images' : 'Duplicate'); showPanel(sel); showToast('Duplicated');
+      } else if (doCommit && lifted) {
         var order = Array.prototype.map.call(stackEl.querySelectorAll('.cell.filled'), function (c) { return parseInt(c.dataset.idx, 10); });
-        var to = order.indexOf(i);
-        if (to !== i) moveImage(i, to); else render();
+        var to = order.indexOf(i), insertAt = 0;
+        for (var q = 0; q < to; q++) if (group.indexOf(order[q]) === -1) insertAt++;
+        if (!moveGroup(group, insertAt, group.length > 1 ? 'Move ' + group.length + ' images' : 'Move')) render();
       } else if (lifted) { render(); }
       if (ghost && ghost.parentNode) ghost.parentNode.removeChild(ghost);
       pid = null; lifted = false; moved = false; scrolling = false; dup = false; ghost = null;
@@ -1351,7 +1443,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       unbind();
       var wasMoved = moved;
       finish(true);
-      if (!wasMoved) toggleSelect(i);
+      if (!wasMoved) toggleSelect(i, e);
     }
     function onCancel(e) { if (e.pointerId !== pid) return; unbind(); finish(false); render(); }
     function unbind() {
@@ -1403,7 +1495,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
         if (target >= imgs.length) imgs.push(moved); else imgs.splice(target, 0, moved);
         if (sel === dragSrc) sel = target;
         else if (sel !== null) { if (dragSrc < sel && target >= sel) sel--; else if (dragSrc > sel && target <= sel) sel++; }
-        dragSrc = null; render(); saveState();
+        dragSrc = null; render(); commit('Move');
       }
     });
   }
@@ -1470,8 +1562,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       applyFill(cutUrl, im.cut.fill, function (url) {
         im.dataUrl = url; im.w = w; im.h = h; im.size = calcSize(url);
         removeBgBtn.disabled = false; removeBgBtn.textContent = '✂ Remove background';
-        render(); saveState(); syncTotalSize();
-        if (sel === idx) selectImg(idx);
+        render(); syncTotalSize(); commit('Remove background');
+        if (sel !== null) showPanel(sel);
         if (pct < 1) showToast('No background detected (' + pct + '% removed) — raise Edge tolerance');
         else if (firstRun) showToast('Background removed (' + pct + '%) — pick a new one below');
       });
@@ -1481,7 +1573,6 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   removeBgBtn.addEventListener('click', function () {
     if (sel === null || removeBgBtn.disabled) return;
     var im = imgs[sel], firstRun = !im.cut;
-    if (firstRun) pushUndo(sel);
     im.cut = { src: im.cut ? im.cut.src : im.dataUrl, tol: parseInt(bgTol.value, 10) || 30, fill: 'transparent' };
     runCut(sel, firstRun);
   });
@@ -1501,8 +1592,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     im.cut.fill = fill;
     applyFill(im.cutoutDataUrl, fill, function (url) {
       im.dataUrl = url; im.size = calcSize(url);
-      render(); saveState(); syncTotalSize();
-      if (sel === idx) selectImg(idx);
+      render(); syncTotalSize(); commit('Background fill');
+      if (sel !== null) showPanel(sel);
     });
   }
 
@@ -1514,7 +1605,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 
   clearAllBtn.addEventListener('click', function () {
     if (!imgs.length) return; if (!confirm('Remove all images?')) return;
-    imgs = []; sel = null; deselect(); render(); syncCount(); syncTotalSize(); syncButtons(); saveState(); showToast('Cleared');
+    imgs = []; deselect(); syncCount(); syncTotalSize(); syncButtons(); commit('Clear all'); showToast('Cleared');
   });
 
   // Quality / format / PDF mode toggles
@@ -1588,19 +1679,19 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   });
 
   // Rotate
-  document.getElementById('rot-ccw').addEventListener('click', function () { if (sel !== null) rotateImage(sel, 270); });
-  document.getElementById('rot-cw').addEventListener('click',  function () { if (sel !== null) rotateImage(sel,  90); });
+  document.getElementById('rot-ccw').addEventListener('click', function () { if (sel !== null) rotateAll(selIdx(), 270); });
+  document.getElementById('rot-cw').addEventListener('click',  function () { if (sel !== null) rotateAll(selIdx(),  90); });
 
   // Per-image enhance
   function onEnhanceChange() {
     if (sel === null) return;
-    var e = imgs[sel].enhance;
-    e.br = parseInt(eBr.value, 10); e.co = parseInt(eCo.value, 10);
-    e.sa = parseInt(eSa.value, 10); e.sh = parseInt(eSh.value, 10);
-    e.hu = parseInt(eHu.value, 10); e.bl = parseInt(eBl.value, 10); e.op = parseInt(eOp.value, 10);
-    syncEnhanceLabels(e);
-    var imgEl = stackEl.querySelector('.cell[data-idx="' + sel + '"] img');
-    if (imgEl) applyPreviewStyle(imgEl, e);
+    var vals = { br: parseInt(eBr.value, 10), co: parseInt(eCo.value, 10), sa: parseInt(eSa.value, 10), sh: parseInt(eSh.value, 10),
+                 hu: parseInt(eHu.value, 10), bl: parseInt(eBl.value, 10), op: parseInt(eOp.value, 10) };
+    selIdx().forEach(function (k) {
+      var e = imgs[k].enhance; Object.keys(vals).forEach(function (key) { e[key] = vals[key]; });
+      var imgEl = stackEl.querySelector('.cell[data-idx="' + k + '"] img'); if (imgEl) applyPreviewStyle(imgEl, e);
+    });
+    syncEnhanceLabels(imgs[sel].enhance);
     saveState();
   }
   function syncEnhanceLabels(e) {
@@ -1613,12 +1704,16 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     eOpVal.textContent = e.op + '%';  eOpVal.classList.toggle('lit', e.op !== 100);
     fxBtns.forEach(function (b) { var on = !!e[b.dataset.fx]; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
   }
-  [eBr, eCo, eSa, eSh, eHu, eBl, eOp].forEach(function (el) { el.addEventListener('input', onEnhanceChange); });
+  [eBr, eCo, eSa, eSh, eHu, eBl, eOp].forEach(function (el) {
+    el.addEventListener('input', onEnhanceChange);
+    el.addEventListener('change', function () { if (sel !== null) commit('Adjust ' + (el.getAttribute('aria-label') || '').toLowerCase()); });
+  });
   fxBtns.forEach(function (b) {
     b.addEventListener('click', function () {
       if (sel === null) return;
-      var e = imgs[sel].enhance; e[b.dataset.fx] = !e[b.dataset.fx];
-      onEnhanceChange();
+      var on = !imgs[sel].enhance[b.dataset.fx];
+      selIdx().forEach(function (k) { imgs[k].enhance[b.dataset.fx] = on; });
+      onEnhanceChange(); commit((on ? 'Add ' : 'Remove ') + b.title.toLowerCase());
     });
   });
 
@@ -1629,61 +1724,59 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
       enhance: JSON.parse(JSON.stringify(src.enhance)), cut: src.cut ? JSON.parse(JSON.stringify(src.cut)) : null,
       cutoutDataUrl: src.cutoutDataUrl || null, undoStack: [], sc: src.sc, ox: src.ox };
   }
-  function duplicateImage(idx) {
-    var copy = makeCopy(imgs[idx]);
-    imgs.splice(idx + 1, 0, copy);
-    render(); syncCount(); syncTotalSize(); syncButtons(); saveState();
-    selectImg(idx + 1); showToast('Duplicated');
+  // copies are inserted right after each source; the copies become the new selection
+  function duplicateImages(t) {
+    if (!t.length) return;
+    var out = [], copies = [];
+    imgs.forEach(function (im, k) { out.push(im); if (t.indexOf(k) !== -1) { var cp = makeCopy(im); copies.push(cp); out.push(cp); } });
+    imgs = out; selIds = copies.map(function (cp) { return cp.id; }); sel = idxOfId(copies[0].id);
+    render(); syncCount(); syncTotalSize(); syncButtons();
+    commit(copies.length > 1 ? 'Duplicate ' + copies.length + ' images' : 'Duplicate');
+    showPanel(sel); showToast(copies.length > 1 ? copies.length + ' images duplicated' : 'Duplicated');
   }
-  document.getElementById('img-dup').addEventListener('click', function () { if (sel !== null) duplicateImage(sel); });
-  document.addEventListener('keydown', function (e) {
-    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'd' && sel !== null) {
-      var t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-      e.preventDefault(); duplicateImage(sel);
-    }
-  });
+  function duplicateImage(idx) { duplicateImages([idx]); }
+  document.getElementById('img-dup').addEventListener('click', function () { if (sel !== null) duplicateImages(selIdx()); });
 
   // Flip
-  document.getElementById('flip-h').addEventListener('click', function () { if (sel !== null) flipImage(sel, 'h'); });
-  document.getElementById('flip-v').addEventListener('click', function () { if (sel !== null) flipImage(sel, 'v'); });
+  document.getElementById('flip-h').addEventListener('click', function () { if (sel !== null) flipAll(selIdx(), 'h'); });
+  document.getElementById('flip-v').addEventListener('click', function () { if (sel !== null) flipAll(selIdx(), 'v'); });
 
   document.getElementById('img-auto').addEventListener('click', function () {
     if (sel === null) return;
-    var e = imgs[sel].enhance; e.br = 5; e.co = 15; e.sa = 20; e.sh = 35;
     eBr.value = 5; eCo.value = 15; eSa.value = 20; eSh.value = 35;
-    onEnhanceChange(); showToast('Auto enhance applied');
+    onEnhanceChange(); commit('Auto enhance'); showToast('Auto enhance applied');
   });
-  document.getElementById('img-undo').addEventListener('click', function () {
-    if (sel === null || !imgs[sel].undoStack || !imgs[sel].undoStack.length) return;
-    var undoState = imgs[sel].undoStack.pop();
-    imgs[sel].dataUrl = undoState.dataUrl;
-    imgs[sel].cut = undoState.cut;
-    imgs[sel].cutoutDataUrl = undoState.cutoutDataUrl;
-    var tmpImg = new Image();
-    tmpImg.onload = function () {
-      imgs[sel].w = tmpImg.width; imgs[sel].h = tmpImg.height;
-      imgs[sel].size = calcSize(imgs[sel].dataUrl);
-      render(); saveState(); syncTotalSize(); selectImg(sel);
-      showToast('Undone');
-    };
-    tmpImg.src = imgs[sel].dataUrl;
-  });
+  document.getElementById('img-undo').addEventListener('click', undo);
+  document.getElementById('img-redo').addEventListener('click', redo);
+  document.getElementById('hist-undo').addEventListener('click', undo);
+  document.getElementById('hist-redo').addEventListener('click', redo);
 
   document.getElementById('img-reset').addEventListener('click', function () {
     if (sel === null) return;
-    var orig = imgs[sel].origDataUrl || imgs[sel].dataUrl;
-    var tmpImg = new Image();
-    tmpImg.onload = function () {
-      imgs[sel].dataUrl = orig;
-      imgs[sel].w = tmpImg.width; imgs[sel].h = tmpImg.height;
-      imgs[sel].size = calcSize(orig);
-      imgs[sel].undoStack = [];
-      imgs[sel].cut = null; imgs[sel].cutoutDataUrl = null;
-      imgs[sel].enhance = defaultEnhance();
-      render(); saveState(); syncTotalSize(); selectImg(sel);
-      showToast('Reset to original');
-    };
-    tmpImg.src = orig;
+    var t = selIdx(), n = t.length;
+    t.forEach(function (k) {
+      var im = imgs[k], orig = im.origDataUrl || im.dataUrl;
+      var tmpImg = new Image();
+      tmpImg.onload = function () {
+        im.dataUrl = orig; im.w = tmpImg.width; im.h = tmpImg.height; im.size = calcSize(orig);
+        im.cut = null; im.cutoutDataUrl = null; im.enhance = defaultEnhance(); im.sc = 1; im.ox = 0;
+        if (--n === 0) { render(); syncTotalSize(); commit('Reset to original'); showPanel(sel); showToast('Reset to original'); }
+      };
+      tmpImg.src = orig;
+    });
+  });
+
+  // ── Global shortcuts ──
+  function inField(t) { return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable); }
+  document.addEventListener('keydown', function (e) {
+    if (inField(e.target) || cropModal.classList.contains('open')) return;
+    var mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase();
+    if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+    if (mod && k === 'y') { e.preventDefault(); redo(); return; }
+    if (mod && k === 'a') { e.preventDefault(); selectAll(); return; }
+    if (mod && !e.shiftKey && k === 'd') { e.preventDefault(); if (sel !== null) duplicateImages(selIdx()); return; }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && sel !== null) { e.preventDefault(); removeImages(selIdx()); return; }
+    if (e.key === 'Escape' && sel !== null && !ctxMenu.classList.contains('open')) { deselect(); return; }
   });
 
   // ── Sharpen convolution ──
@@ -2012,14 +2105,13 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     var px = Math.round(cropX * sx), py = Math.round(cropY * sy);
     var pw = Math.round(cropCW * sx), ph = Math.round(cropCH * sy);
     var im = imgs[cropIdx];
-    pushUndo(cropIdx);
     cropUrl(im.dataUrl, px, py, pw, ph, isTransparentCut(im), function (newUrl) {
       im.dataUrl = newUrl;
       im.w = pw; im.h = ph;
       im.size = calcSize(newUrl);
       function finish() {
-        render(); saveState(); syncTotalSize();
-        if (sel === cropIdx) selectImg(cropIdx);
+        render(); syncTotalSize(); commit('Crop');
+        if (sel !== null) showPanel(sel);
         closeCrop(); showToast('Image cropped');
       }
       if (im.cut && im.cutoutDataUrl) {
@@ -2051,6 +2143,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   loadSettings();
   loadImages(function () {
     render(); syncCount(); syncTotalSize(); syncButtons(); syncCompressRow();
+    hist = [snapState('Open')]; hp = 0; syncHistBtns();
   });
 })();
 </script>
