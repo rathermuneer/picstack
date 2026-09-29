@@ -239,6 +239,11 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 #stack.h .cell.filled img { width: auto; height: 100%; }
 .cell.filled.drag-on { box-shadow: inset 0 0 0 2px var(--accent); }
 .cell.filled.dragging { opacity: 0.35; }
+.cell.filled { touch-action: none; }
+.cell.filled.lifting { z-index: 30; box-shadow: 0 0 0 2px var(--accent), 0 14px 32px rgba(0,0,0,0.55);
+  transition: none; cursor: grabbing; opacity: 0.92; }
+.cell.filled.lifting .cell-toolbar { opacity: 0; }
+#stack.reordering .cell.filled:not(.lifting) { transition: transform 0.12s; }
 .cell.filled.selected { box-shadow: inset 0 0 0 2px var(--accent); }
 .cell-toolbar { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center;
   justify-content: space-between; padding: 6px 8px;
@@ -489,7 +494,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     <div id="empty-msg" aria-live="polite">
       <div class="empty-icon" aria-hidden="true">⬡</div>
       <div class="empty-head">Drop images anywhere to start</div>
-      <div class="empty-body">or click Add images<br>drag to reorder · click to select</div>
+      <div class="empty-body">or click Add images<br>drag an image to move it · click to select</div>
       <div class="privacy-note"><span>🔒 Your images never leave your device — no uploads, no account, free forever</span></div>
     </div>
   </main>
@@ -1018,10 +1023,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     var left = document.createElement('div'); left.style.cssText = 'display:flex;align-items:center;gap:6px';
     var num = document.createElement('span'); num.className = 'cell-num'; num.setAttribute('aria-hidden','true');
     num.textContent = String(i+1).padStart(2,'0');
-    var dragHandle = document.createElement('div'); dragHandle.className = 'cell-drag';
-    dragHandle.setAttribute('title', 'Drag to reorder');
-    dragHandle.innerHTML = '<span></span><span></span><span></span>';
-    left.appendChild(dragHandle); left.appendChild(num); tb.appendChild(left);
+    left.appendChild(num); tb.appendChild(left);
     var rm = document.createElement('button'); rm.className = 'cell-rm'; rm.innerHTML = '&times;';
     rm.setAttribute('aria-label', 'Remove image ' + (i+1));
     rm.addEventListener('click', function (e) {
@@ -1032,16 +1034,112 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     tb.appendChild(rm); cell.appendChild(tb);
     cell.tabIndex = 0;
     cell.setAttribute('aria-label', 'Image ' + (i + 1) + ': ' + (imgs[i].name || 'untitled') + '. Press Enter to select.');
-    cell.addEventListener('click', function () { if (sel === i) deselect(); else selectImg(i); });
-    cell.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cell.click(); } });
-    dragHandle.addEventListener('mousedown', function () { cell.draggable = true; });
-    cell.addEventListener('dragstart', function (e) {
-      if (e.dataTransfer.types && Array.prototype.indexOf.call(e.dataTransfer.types,'Files') !== -1) return;
-      dragSrc = i; cell.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', String(i));
+    cell.setAttribute('title', 'Drag to move · click to select');
+    cell.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSelect(i); return; }
+      // keyboard reorder: Alt+Arrow moves the image up/down (or left/right) the stack
+      var back = e.key === 'ArrowUp' || e.key === 'ArrowLeft', fwd = e.key === 'ArrowDown' || e.key === 'ArrowRight';
+      if (e.altKey && (back || fwd)) {
+        e.preventDefault(); var to = back ? i - 1 : i + 1;
+        if (to < 0 || to >= imgs.length) return;
+        moveImage(i, to); var again = stackEl.querySelector('.cell[data-idx="' + to + '"]'); if (again) again.focus();
+      }
     });
-    cell.addEventListener('dragend', function () { cell.classList.remove('dragging'); cell.draggable = false; dragSrc = null; clearDragOn(); });
+    attachPointerDrag(cell, i);
     addDropListeners(cell, i, true); return cell;
+  }
+
+  function toggleSelect(i) { if (sel === i) deselect(); else selectImg(i); }
+
+  function moveImage(from, to) {
+    if (from === to) return;
+    var moved = imgs.splice(from, 1)[0]; imgs.splice(to, 0, moved);
+    if (sel === from) sel = to;
+    else if (sel !== null) { if (from < sel && to >= sel) sel--; else if (from > sel && to <= sel) sel++; }
+    render(); saveState();
+    announce('Image moved to position ' + (to + 1));
+  }
+
+  // ── Direct drag: grab an image anywhere, it follows the pointer, and slides into a new slot as you pass others ──
+  function attachPointerDrag(cell, i) {
+    var pid = null, sx, sy, moved = false, lifted = false, baseL, baseT, tx = 0, ty = 0;
+    var scrolling = false, lastX, lastY, downAt = 0, pressTimer = null;
+    var THRESH = 4;
+    function horiz() { return stackDir === 'h'; }
+    function lift() {
+      lifted = true; cell.classList.add('lifting'); stackEl.classList.add('reordering');
+      var r = cell.getBoundingClientRect(); baseL = r.left; baseT = r.top; tx = 0; ty = 0;
+    }
+    function place(px, py) {
+      var r = cell.getBoundingClientRect();
+      var natL = r.left - tx, natT = r.top - ty;
+      tx = (baseL + (px - sx)) - natL; ty = (baseT + (py - sy)) - natT;
+      cell.style.transform = 'translate(' + tx + 'px,' + ty + 'px)';
+    }
+    function reorder(px, py) {
+      var sibs = Array.prototype.filter.call(stackEl.children, function (c) { return c !== cell && c.classList.contains('filled'); });
+      var p = horiz() ? px : py;
+      for (var k = 0; k < sibs.length; k++) {
+        var r = sibs[k].getBoundingClientRect();
+        var mid = horiz() ? r.left + r.width / 2 : r.top + r.height / 2;
+        var before = !!(sibs[k].compareDocumentPosition(cell) & Node.DOCUMENT_POSITION_FOLLOWING); // sib is before cell
+        if (before && p < mid) { stackEl.insertBefore(cell, sibs[k]); return; }
+        if (!before && p > mid) { stackEl.insertBefore(cell, sibs[k].nextSibling); return; }
+      }
+    }
+    function autoScroll(py) {
+      var wr = workspace.getBoundingClientRect(), edge = 48;
+      if (py < wr.top + edge) workspace.scrollTop -= 12;
+      else if (py > wr.bottom - edge) workspace.scrollTop += 12;
+    }
+    function finish(commit) {
+      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+      cell.classList.remove('lifting'); stackEl.classList.remove('reordering'); cell.style.transform = '';
+      if (commit && lifted) {
+        var order = Array.prototype.map.call(stackEl.querySelectorAll('.cell.filled'), function (c) { return parseInt(c.dataset.idx, 10); });
+        var to = order.indexOf(i);
+        if (to !== i) moveImage(i, to); else render();
+      }
+      pid = null; lifted = false; moved = false; scrolling = false;
+    }
+    // Listeners live on window during a drag: moving the cell within the DOM would drop pointer capture.
+    function onMove(e) {
+      if (e.pointerId !== pid) return;
+      var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (scrolling) { workspace.scrollTop -= (e.clientY - lastY); workspace.scrollLeft -= (e.clientX - lastX); lastX = e.clientX; lastY = e.clientY; return; }
+      if (!lifted) {
+        if (Math.abs(dx) + Math.abs(dy) < THRESH) return;
+        if (e.pointerType !== 'mouse' && pressTimer) { clearTimeout(pressTimer); pressTimer = null; scrolling = true; lastX = e.clientX; lastY = e.clientY; return; }
+        lift(); moved = true;
+      }
+      e.preventDefault();
+      place(e.clientX, e.clientY);
+      reorder(e.clientX, e.clientY);
+      place(e.clientX, e.clientY);
+      autoScroll(e.clientY);
+    }
+    function onUp(e) {
+      if (e.pointerId !== pid) return;
+      unbind();
+      var wasMoved = moved;
+      finish(true);
+      if (!wasMoved) toggleSelect(i);
+    }
+    function onCancel(e) { if (e.pointerId !== pid) return; unbind(); finish(false); render(); }
+    function unbind() {
+      window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onCancel);
+    }
+    cell.addEventListener('pointerdown', function (e) {
+      if (pid !== null || (e.button !== undefined && e.button !== 0)) return;
+      if (e.target.closest('.cell-rm')) return;
+      pid = e.pointerId; sx = lastX = e.clientX; sy = lastY = e.clientY; moved = false; lifted = false; scrolling = false; downAt = Date.now();
+      window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp); window.addEventListener('pointercancel', onCancel);
+      if (e.pointerType === 'mouse') { e.preventDefault(); }
+      else {
+        // touch: hold briefly to pick up; a quick swipe scrolls the workspace instead
+        pressTimer = setTimeout(function () { pressTimer = null; if (pid !== null && !scrolling) { lift(); moved = true; if (navigator.vibrate) navigator.vibrate(10); } }, 220);
+      }
+    });
   }
 
   function makeEmptyCell(i) {
