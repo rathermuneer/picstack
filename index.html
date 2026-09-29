@@ -936,7 +936,14 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   function uid() { return Math.random().toString(36).slice(2); }
   function isText(im) { return !!im && im.type === 'text'; }
   function defaultTx() { return { text: 'Your caption', font: 'Inter, system-ui, sans-serif', size: 32, color: '#111111', bg: 'transparent', align: 'center', bold: false, italic: false }; }
-  function newTextRec() { return { id: uid(), type: 'text', name: 'Text', tx: defaultTx(), w: 400, h: 100, size: 0, enhance: defaultEnhance(), sc: 1, ox: 0 }; }
+  // caption colour contrasts with the current background: white on dark, near-black on light
+  function bgIsDark() {
+    if (!bg || bg === 'transparent') return false;
+    var m = /^#?([0-9a-f]{6})$/i.exec(bg); if (!m) return false;
+    var n = parseInt(m[1], 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
+    return (0.299 * r + 0.587 * g + 0.114 * b) < 128;
+  }
+  function newTextRec() { var tx = defaultTx(); tx.color = bgIsDark() ? '#ffffff' : '#111111'; return { id: uid(), type: 'text', name: 'Text', tx: tx, w: 400, h: 100, size: 0, enhance: defaultEnhance(), sc: 1, ox: 0 }; }
   function txFont(tx, k) { return (tx.italic ? 'italic ' : '') + (tx.bold ? '700 ' : '400 ') + (tx.size * (k || 1)) + 'px ' + tx.font; }
   // wrap text for canvas: returns lines and total box height (padding = half the font size)
   function measureTx(ctx, tx, w, k) {
