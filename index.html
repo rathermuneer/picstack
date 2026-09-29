@@ -1214,13 +1214,6 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     cell.setAttribute('title', 'Drag to move · click to select');
     cell.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSelect(i, e); return; }
-      // keyboard reorder: Alt+Arrow moves the image up/down (or left/right) the stack
-      var back = e.key === 'ArrowUp' || e.key === 'ArrowLeft', fwd = e.key === 'ArrowDown' || e.key === 'ArrowRight';
-      if (e.altKey && (back || fwd)) {
-        e.preventDefault(); var to = back ? i - 1 : i + 1;
-        if (to < 0 || to >= imgs.length) return;
-        moveImage(i, to); var again = stackEl.querySelector('.cell[data-idx="' + to + '"]'); if (again) again.focus();
-      }
     });
     attachPointerDrag(cell, i);
     addDropListeners(cell, i, true); return cell;
@@ -1777,6 +1770,23 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     if (mod && !e.shiftKey && k === 'd') { e.preventDefault(); if (sel !== null) duplicateImages(selIdx()); return; }
     if ((e.key === 'Delete' || e.key === 'Backspace') && sel !== null) { e.preventDefault(); removeImages(selIdx()); return; }
     if (e.key === 'Escape' && sel !== null && !ctxMenu.classList.contains('open')) { deselect(); return; }
+    // Arrows: move the selection one slot. Shift+Arrow: nudge its offset 1% across the stack (5% with Alt).
+    if (sel !== null && /^Arrow/.test(e.key)) {
+      var back = e.key === 'ArrowUp' || e.key === 'ArrowLeft', t = selIdx();
+      if (e.shiftKey) {
+        var cross = stackDir === 'h' ? (e.key === 'ArrowUp' || e.key === 'ArrowDown') : (e.key === 'ArrowLeft' || e.key === 'ArrowRight');
+        if (!cross) return;
+        var step = (e.altKey ? 0.05 : 0.01) * (back ? -1 : 1);
+        t.forEach(function (k) { var z = sizeOf(imgs[k]); setSize(k, z.sc, z.ox + step); });
+        e.preventDefault(); commit('Nudge'); return;
+      }
+      e.preventDefault();
+      var first = t[0], lastI = t[t.length - 1];
+      if (back ? first === 0 : lastI === imgs.length - 1) return;
+      moveGroup(t, back ? first - 1 : first + 1, 'Move');
+      announce('Moved to position ' + (idxOfId(imgs[sel].id) + 1));
+      return;
+    }
   });
 
   // ── Sharpen convolution ──
