@@ -446,6 +446,22 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
           <input type="range" class="sl enh-sl" id="e-sa" min="-50" max="100" value="0" aria-label="Saturation">
         </div>
         <div class="enh-row">
+          <div class="enh-header"><span class="enh-label">Temperature</span><span class="enh-val" id="e-tp-val">0</span></div>
+          <input type="range" class="sl enh-sl" id="e-tp" min="-100" max="100" value="0" aria-label="Temperature">
+        </div>
+        <div class="enh-row">
+          <div class="enh-header"><span class="enh-label">Tint</span><span class="enh-val" id="e-tn-val">0</span></div>
+          <input type="range" class="sl enh-sl" id="e-tn" min="-100" max="100" value="0" aria-label="Tint">
+        </div>
+        <div class="ctrl-row" style="margin-bottom:10px" role="group" aria-label="Auto levels">
+          <span class="ctrl-label">Auto</span>
+          <div class="xopt-btns">
+            <button class="xopt" data-auto="contrast" aria-pressed="false" title="Auto contrast — stretch the tonal range">Contrast</button>
+            <button class="xopt" data-auto="color" aria-pressed="false" title="Auto colour — balance each channel">Colour</button>
+            <button class="xopt on" data-auto="off" aria-pressed="true" title="No auto levels">Off</button>
+          </div>
+        </div>
+        <div class="enh-row">
           <div class="enh-header"><span class="enh-label">Sharpen</span><span class="enh-val" id="e-sh-val">0</span></div>
           <input type="range" class="sl enh-sl" id="e-sh" min="0" max="100" value="0" aria-label="Sharpen">
         </div>
@@ -603,6 +619,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
 <canvas id="exp-canvas" style="display:none" aria-hidden="true"></canvas>
 <input type="file" id="file-input" accept="image/*,.heic,.heif" multiple style="display:none" aria-hidden="true">
 <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none" aria-hidden="true">
+<svg id="cm-svg" width="0" height="0" style="position:absolute;width:0;height:0" aria-hidden="true"><defs id="cm-defs"></defs></svg>
 <div id="hist-bar" role="group" aria-label="History">
   <button id="hist-undo" title="Undo (⌘Z)" aria-label="Undo" disabled>↩</button>
   <button id="hist-redo" title="Redo (⇧⌘Z)" aria-label="Redo" disabled>↪</button>
@@ -690,13 +707,16 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   var eRot = document.getElementById('e-rot'), eRotVal = document.getElementById('e-rot-val');
   var eVg = document.getElementById('e-vg'), eVgVal = document.getElementById('e-vg-val');
   var eRc = document.getElementById('e-rc'), eRcVal = document.getElementById('e-rc-val');
+  var eTp = document.getElementById('e-tp'), eTpVal = document.getElementById('e-tp-val');
+  var eTn = document.getElementById('e-tn'), eTnVal = document.getElementById('e-tn-val');
+  var autoBtns = document.querySelectorAll('[data-auto]');
   var fxBtns = document.querySelectorAll('[data-fx]');
   var installBar  = document.getElementById('install-bar');
   var installBtn  = document.getElementById('install-btn');
   var installDismiss = document.getElementById('install-dismiss');
 
   // ── Helpers ──
-  function defaultEnhance() { return { br:0, co:0, sa:0, sh:0, hu:0, bl:0, op:100, gs:false, sp:false, inv:false, rot:0, vg:0, rc:0 }; }
+  function defaultEnhance() { return { br:0, co:0, sa:0, sh:0, hu:0, bl:0, op:100, gs:false, sp:false, inv:false, rot:0, vg:0, rc:0, tp:0, tn:0, lv:null, auto:'off' }; }
   function normEnhance(e) {
     var d = defaultEnhance(); e = e || {};
     Object.keys(d).forEach(function (k) { if (e[k] === undefined || e[k] === null) e[k] = d[k]; });
@@ -704,7 +724,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   }
   function isDefaultEnhance(e) {
     var d = defaultEnhance();
-    return Object.keys(d).every(function (k) { return e[k] === d[k]; });
+    return Object.keys(d).every(function (k) { return k === 'lv' ? !e.lv : e[k] === d[k]; });
   }
   function uid() { return Math.random().toString(36).slice(2); }
   function fmtV(v) { return (v > 0 ? '+' : '') + v; }
@@ -1037,6 +1057,67 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     if (e.bl)  f += ' blur(' + e.bl + 'px)';
     return f;
   }
+  // ── Colour matrix: per-channel scale/offset for temperature, tint and auto levels ──
+  function colorMatrix(e) {
+    var a = [1, 1, 1], b = [0, 0, 0];
+    if (e.lv) for (var c = 0; c < 3; c++) { var lo = e.lv[c * 2], hi = e.lv[c * 2 + 1], sc = 1 / Math.max(0.02, hi - lo); a[c] *= sc; b[c] -= lo * sc; }
+    var t = (e.tp || 0) / 100, n = (e.tn || 0) / 100;
+    a[0] *= 1 + 0.3 * t; a[2] *= 1 - 0.3 * t;   // warm: more red, less blue
+    a[1] *= 1 - 0.2 * n;                        // + magenta / − green
+    return { a: a, b: b, identity: a[0] === 1 && a[1] === 1 && a[2] === 1 && b[0] === 0 && b[1] === 0 && b[2] === 0 };
+  }
+  function matrixFilterUrl(im) {
+    var m = colorMatrix(normEnhance(im.enhance)), defs = document.getElementById('cm-defs'), id = 'cm-' + im.id;
+    var f = document.getElementById(id);
+    if (m.identity) { if (f) f.parentNode.removeChild(f); return ''; }
+    if (!f) {
+      f = document.createElementNS('http://www.w3.org/2000/svg', 'filter'); f.id = id; f.setAttribute('color-interpolation-filters', 'sRGB');
+      var fe = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix'); fe.setAttribute('type', 'matrix'); f.appendChild(fe); defs.appendChild(f);
+    }
+    var v = [m.a[0], 0, 0, 0, m.b[0], 0, m.a[1], 0, 0, m.b[1], 0, 0, m.a[2], 0, m.b[2], 0, 0, 0, 1, 0].map(function (x) { return +x.toFixed(4); }).join(' ');
+    f.firstChild.setAttribute('values', v);
+    return 'url(#' + id + ') ';
+  }
+  function applyMatrixPixels(ctx, w, h, m) {
+    var img = ctx.getImageData(0, 0, w, h), d = img.data, a0 = m.a[0], a1 = m.a[1], a2 = m.a[2], b0 = m.b[0] * 255, b1 = m.b[1] * 255, b2 = m.b[2] * 255;
+    for (var i = 0; i < d.length; i += 4) {
+      var r = a0 * d[i] + b0, g = a1 * d[i + 1] + b1, bl = a2 * d[i + 2] + b2;
+      d[i] = r < 0 ? 0 : r > 255 ? 255 : r; d[i + 1] = g < 0 ? 0 : g > 255 ? 255 : g; d[i + 2] = bl < 0 ? 0 : bl > 255 ? 255 : bl;
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  // Auto levels: sample the image and find the 0.5% / 99.5% percentiles, per channel (colour) or on luminance (contrast)
+  function computeLevels(im, mode, cb) {
+    var img = new Image();
+    img.onload = function () {
+      var W = 160, H = Math.max(1, Math.round(W * img.height / img.width)), c = document.createElement('canvas'); c.width = W; c.height = H;
+      var x = c.getContext('2d'); x.drawImage(img, 0, 0, W, H);
+      var d = x.getImageData(0, 0, W, H).data, hist = [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)], n = 0;
+      for (var i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 8) continue; n++;
+        if (mode === 'color') { hist[0][d[i]]++; hist[1][d[i + 1]]++; hist[2][d[i + 2]]++; }
+        else { var l = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]); hist[0][l]++; }
+      }
+      function pct(hh, p) { var acc = 0, target = n * p; for (var k = 0; k < 256; k++) { acc += hh[k]; if (acc >= target) return k / 255; } return 1; }
+      var lv;
+      if (mode === 'color') lv = [pct(hist[0], 0.005), pct(hist[0], 0.995), pct(hist[1], 0.005), pct(hist[1], 0.995), pct(hist[2], 0.005), pct(hist[2], 0.995)];
+      else { var lo = pct(hist[0], 0.005), hi = pct(hist[0], 0.995); lv = [lo, hi, lo, hi, lo, hi]; }
+      cb(lv);
+    };
+    img.onerror = function () { cb(null); };
+    img.src = im.dataUrl;
+  }
+  function setAuto(mode) {
+    var t = selIdx(); if (!t.length) return;
+    if (mode === 'off') { t.forEach(function (k) { imgs[k].enhance.lv = null; imgs[k].enhance.auto = 'off'; }); refreshPreviews(t); commit('Auto levels off'); return; }
+    var n = t.length;
+    t.forEach(function (k) { computeLevels(imgs[k], mode, function (lv) { imgs[k].enhance.lv = lv; imgs[k].enhance.auto = lv ? mode : 'off'; if (--n === 0) { refreshPreviews(t); commit(mode === 'color' ? 'Auto colour' : 'Auto contrast'); showToast(mode === 'color' ? 'Auto colour applied' : 'Auto contrast applied'); } }); });
+  }
+  function refreshPreviews(t) {
+    t.forEach(function (k) { var imgEl = stackEl.querySelector('.cell[data-idx="' + k + '"] img'); if (imgEl) applyPreviewStyle(imgEl, imgs[k]); });
+    if (sel !== null) syncEnhanceLabels(imgs[sel].enhance);
+  }
+
   // straighten: scale so the rotated image still covers its frame (Photoshop's "crop to fill")
   function coverScale(w, h, deg) {
     var r = Math.abs(deg) * Math.PI / 180, c = Math.cos(r), sn = Math.sin(r);
@@ -1045,7 +1126,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
   function vigStops(vg) { return { inner: Math.max(0.15, 0.75 - vg / 100 * 0.45), alpha: vg / 100 * 0.85 }; }
   function applyPreviewStyle(imgEl, im) {
     var e = normEnhance(im.enhance);
-    imgEl.style.filter = imgFilter(e);
+    imgEl.style.filter = matrixFilterUrl(im) + imgFilter(e);
     imgEl.style.opacity = e.op === 100 ? '' : (e.op / 100);
     imgEl.style.transform = e.rot ? 'rotate(' + e.rot + 'deg) scale(' + coverScale(im.w || 4, im.h || 3, e.rot).toFixed(4) + ')' : '';
     // corners as px of the shorter displayed side, estimated from the layout fraction
@@ -1191,7 +1272,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     }
     e = imgs[i].enhance = normEnhance(e);
     eBr.value = e.br; eCo.value = e.co; eSa.value = e.sa; eSh.value = e.sh; eHu.value = e.hu; eBl.value = e.bl; eOp.value = e.op;
-    eRot.value = e.rot; eVg.value = e.vg; eRc.value = e.rc;
+    eRot.value = e.rot; eVg.value = e.vg; eRc.value = e.rc; eTp.value = e.tp; eTn.value = e.tn;
     syncEnhanceLabels(e);
     var cut = imgs[i].cut;
     document.getElementById('bgfill-controls').style.display = cut ? 'block' : 'none';
@@ -1718,7 +1799,8 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     if (sel === null) return;
     var vals = { br: parseInt(eBr.value, 10), co: parseInt(eCo.value, 10), sa: parseInt(eSa.value, 10), sh: parseInt(eSh.value, 10),
                  hu: parseInt(eHu.value, 10), bl: parseInt(eBl.value, 10), op: parseInt(eOp.value, 10),
-                 rot: parseFloat(eRot.value) || 0, vg: parseInt(eVg.value, 10), rc: parseInt(eRc.value, 10) };
+                 rot: parseFloat(eRot.value) || 0, vg: parseInt(eVg.value, 10), rc: parseInt(eRc.value, 10),
+                 tp: parseInt(eTp.value, 10), tn: parseInt(eTn.value, 10) };
     selIdx().forEach(function (k) {
       var e = imgs[k].enhance; Object.keys(vals).forEach(function (key) { e[key] = vals[key]; });
       var imgEl = stackEl.querySelector('.cell[data-idx="' + k + '"] img'); if (imgEl) applyPreviewStyle(imgEl, imgs[k]);
@@ -1737,9 +1819,13 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     eRotVal.textContent = (e.rot > 0 ? '+' : '') + e.rot + '°'; eRotVal.classList.toggle('lit', e.rot !== 0);
     eVgVal.textContent = e.vg;        eVgVal.classList.toggle('lit', e.vg !== 0);
     eRcVal.textContent = e.rc + '%';  eRcVal.classList.toggle('lit', e.rc !== 0);
+    eTpVal.textContent = fmtV(e.tp); eTpVal.classList.toggle('lit', e.tp !== 0);
+    eTnVal.textContent = fmtV(e.tn); eTnVal.classList.toggle('lit', e.tn !== 0);
+    autoBtns.forEach(function (b) { var on = (e.auto || 'off') === b.dataset.auto; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
     fxBtns.forEach(function (b) { var on = !!e[b.dataset.fx]; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
   }
-  [eBr, eCo, eSa, eSh, eHu, eBl, eOp, eRot, eVg, eRc].forEach(function (el) {
+  autoBtns.forEach(function (b) { b.addEventListener('click', function () { if (sel !== null) setAuto(b.dataset.auto); }); });
+  [eBr, eCo, eSa, eSh, eHu, eBl, eOp, eRot, eVg, eRc, eTp, eTn].forEach(function (el) {
     el.addEventListener('input', onEnhanceChange);
     el.addEventListener('change', function () { if (sel !== null) commit('Adjust ' + (el.getAttribute('aria-label') || '').toLowerCase()); });
   });
@@ -1890,6 +1976,7 @@ html, body { height: 100%; background: var(--ground); color: var(--text);
     if (e.rot) { var sc = coverScale(w, h, e.rot); tc.translate(w / 2, h / 2); tc.rotate(e.rot * Math.PI / 180); tc.scale(sc, sc); tc.drawImage(im, -w / 2, -h / 2, w, h); }
     else tc.drawImage(im, 0, 0, w, h);
     tc.restore();
+    var cm = colorMatrix(e); if (!cm.identity) applyMatrixPixels(tc, w, h, cm);
     if (e.sh > 0) applySharpen(tc, w, h, e.sh);
     if (e.vg > 0) {
       var v = vigStops(e.vg);
